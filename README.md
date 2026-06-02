@@ -107,7 +107,29 @@ domain/(实体+值对象+端口 Protocol) → application/services → infrastru
 
 命令按选型自动裁剪，只生成存在服务对应的层，末尾给出**待填充 TODO 清单**。
 
-> 分工：脚手架预生成 `core/` 等可运行 plumbing；`/new-feature` 引导 Claude 搭**结构正确、契约清晰、零需调试**的骨架；业务逻辑你按 `testing-tdd.md`（先测试后实现）自己填。
+> 分工：脚手架 **copier 预生成完整架构基座**（分层目录 + 横切层，确定性、能跑、过门禁，见下「架构基座」）；`/new-feature` 引导 Claude 在基座上搭功能切片骨架；业务逻辑你按 `testing-tdd.md`（先测试后实现）自己填。
+
+---
+
+## 架构基座（每个生成项目自带，开箱即跑）
+
+不加任何功能，生成的项目第一天就有**完整分层结构 + 与业务无关的横切基础设施**，三服务各自通过 ruff/mypy/build 门禁：
+
+```
+backend/src/                         agent/src/                      frontend/src/
+├── domain/            (空层包)       ├── domain/  dag/  llm/         ├── components/ErrorBoundary
+├── application/services/            ├── providers/ export/ storage/ ├── services/wsClient
+├── infrastructure/db/ base(engine)  │     (空层包)                  ├── utils/logger
+├── routers/  health + ws            ├── domain/exceptions           ├── App / main(ErrorBoundary
+├── middleware/ request_id+access    ├── utils/ ids/files/concurrency│   + Toaster) + tailwind
+├── exceptions/ AppException+handler ├── core/ config+logging        └── vite 类型
+├── utils/ ids+files(防穿越)         └── main  health/ready + ws
+└── core/ config+logging+deps
+```
+
+- **横切层是确定性的**（中间件、异常、DB 接线、日志、WS、错误边界规则里逐字给定）→ copier 预生成，永远一致、不漂移。
+- **运行时目录**（日志 `~/{项目}/logs/`、临时 `~/{项目}/{uuid}/`）由代码按需创建，不入库。
+- 空层包（domain/services 等）等 `/new-feature` 或你按规则填业务。
 
 ---
 
@@ -152,9 +174,13 @@ scaffold/
     │       ├── agent.md.jinja           ← 技术栈表 / 依赖 / 目录 / 配置 / 测试
     │       ├── agent-concurrency.md.jinja  ← PTY 并发节 vs API 并发节
     │       └── backend-db.md.jinja      ← SQLite 配置 vs PostgreSQL 配置
-    ├── backend/  pyproject.toml / Dockerfile / .env.example / src/
-    ├── agent/    同上
-    └── frontend/ package.json / pnpm-workspace.yaml / tsconfig / eslint / prettier / vitest / vite
+    ├── backend/  pyproject / Dockerfile / .env.example
+    │   └── src/  架构基座：domain application infrastructure/db routers middleware
+    │             exceptions utils core（详见上「架构基座」）
+    ├── agent/    pyproject / Dockerfile / .env.example
+    │   └── src/  架构基座：domain dag llm providers export storage utils core + WS
+    └── frontend/ package.json / pnpm-workspace / tsconfig / tailwind / postcss / eslint / vite
+        └── src/  架构基座：components(ErrorBoundary) services(wsClient) utils(logger) + 入口
 ```
 
 ---
