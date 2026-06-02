@@ -1,0 +1,40 @@
+services:
+{%- if include_agent %}
+  agent:
+    build: ./agent
+    env_file: ./agent/.env
+    ports:
+      - "{{ agent_port }}:{{ agent_port }}"
+    restart: unless-stopped
+{%- endif %}
+
+{%- if include_backend %}
+  backend:
+    build: ./backend
+    env_file: ./backend/.env
+    ports:
+      - "{{ backend_port }}:{{ backend_port }}"
+{%- if include_agent %}
+    depends_on:
+      - agent
+{%- endif %}
+    restart: unless-stopped
+{%- endif %}
+
+{%- if include_frontend %}
+  frontend:
+    build:
+      context: ./frontend
+{%- if include_backend %}
+      args:
+        VITE_BACKEND_WS_URL: ws://localhost:{{ backend_port }}
+        VITE_BACKEND_HTTP_URL: http://localhost:{{ backend_port }}
+{%- endif %}
+    ports:
+      - "{{ frontend_port }}:80"
+{%- if include_backend %}
+    depends_on:
+      - backend
+{%- endif %}
+    restart: unless-stopped
+{%- endif %}

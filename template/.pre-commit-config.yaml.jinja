@@ -1,0 +1,67 @@
+# 提交前自动跑的质量门禁。安装：pre-commit install
+# 手动全量：pre-commit run --all-files
+repos:
+  # 通用
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  # 提交信息规范（Conventional Commits）
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+
+{%- if include_backend or include_agent %}
+
+  # Python（ruff 同时做 lint + format）
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.6.9
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+{%- endif %}
+
+{%- if include_backend %}
+
+  - repo: local
+    hooks:
+      - id: mypy-backend
+        name: mypy (backend)
+        entry: bash -c 'cd backend && uv run mypy src'
+        language: system
+        files: ^backend/.*\.py$
+        pass_filenames: false
+{%- endif %}
+
+{%- if include_agent %}
+
+  - repo: local
+    hooks:
+      - id: mypy-agent
+        name: mypy (agent)
+        entry: bash -c 'cd agent && uv run mypy src'
+        language: system
+        files: ^agent/.*\.py$
+        pass_filenames: false
+{%- endif %}
+
+{%- if include_frontend %}
+
+  # 前端：lint + 类型检查
+  - repo: local
+    hooks:
+      - id: frontend-lint
+        name: eslint + tsc (frontend)
+        entry: bash -c 'cd frontend && pnpm lint && pnpm typecheck'
+        language: system
+        files: ^frontend/.*\.(ts|tsx)$
+        pass_filenames: false
+{%- endif %}

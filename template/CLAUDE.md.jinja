@@ -1,0 +1,78 @@
+# {{ project_name }}
+
+{{ description }}
+
+## 架构
+
+```
+{%- if include_frontend %}
+frontend/  React+Vite+TS+Tailwind   通用域
+{%- endif %}
+{%- if include_backend %}
+backend/   FastAPI :{{ backend_port }}  WebSocket 代理 + 持久化      支撑域
+{%- endif %}
+{%- if include_agent %}
+agent/     FastAPI :{{ agent_port }}  LLM 编排 + 业务核心域
+{%- endif %}
+```
+
+---
+
+## 启动方式
+
+```bash
+# 首次：每个目录 cp .env.example .env，按需修改
+{%- if include_backend or include_agent %}
+# backend/agent 用 uv sync
+{%- endif %}
+{%- if include_frontend %}
+# frontend 用 pnpm install
+{%- endif %}
+
+# 运行（各服务独立终端）
+{%- if include_agent %}
+cd agent    && uv run python -m src.main
+{%- endif %}
+{%- if include_backend %}
+cd backend  && uv run python -m src.main
+{%- endif %}
+{%- if include_frontend %}
+cd frontend && pnpm dev
+{%- endif %}
+# 或 docker compose up --build
+```
+
+包管理：
+{%- if include_backend or include_agent %}
+backend/agent 用 **uv**（`uv.lock`）
+{%- endif %}
+{%- if include_frontend %}
+frontend 用 **pnpm**（`pnpm-lock.yaml`）
+{%- endif %}
+锁文件必须提交。
+
+---
+
+## 关键约定（详见 rules）
+
+- 命名：**Python = snake_case**，**前端 TS = camelCase**，**通信线 JSON = snake_case**
+- 禁 `print()` / `console.log()`，统一用各层 logger
+- **先定契约（DbC）→ 测试先行（TDD）→ 实现 → 重构**
+- 新功能插扩展点，不改核心；依赖恒向内指向 domain
+
+---
+
+## 规则索引（`.claude/rules/`）
+
+| 全局（恒加载） | 内容 |
+|------|------|
+| architecture.md | 三层架构 / 限界上下文 / 六边形分层 / 依赖方向 |
+| ddd.md | 统一语言术语表 / 领域建模 6 条强制 |
+| design-discipline.md | SOLID / 契约式设计 / 高内聚低耦合 / 扩展点 |
+| communication-protocol.md | 传输选型 / 命令-事件 / 信封 / 语义 |
+| testing-tdd.md | TDD 流程 / 测试金字塔 / 覆盖率门禁 |
+| quality-gates.md | lint/format/type/test / 依赖安全 |
+| security.md | 安全基线 |
+| config.md | .env 规约 |
+| git-workflow.md | Conventional Commits / 分支 / PR / SemVer |
+| conventions.md | 命名 / 禁 print&console / 注释 / 包管理 |

@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+{%- if include_backend %}
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "{{ python_version }}"
+      - run: uv sync
+      - run: uv run ruff check src
+      - run: uv run ruff format --check src
+      - run: uv run mypy src
+      - run: uv run pip-audit
+{%- if database == 'sqlite' %}
+      - run: uv run alembic upgrade head
+{%- endif %}
+      - run: uv run pytest --cov=src --cov-fail-under=80
+{%- endif %}
+
+{%- if include_agent %}
+  agent:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          python-version: "{{ python_version }}"
+      - run: uv sync
+      - run: uv run ruff check src
+      - run: uv run ruff format --check src
+      - run: uv run mypy src
+      - run: uv run pip-audit
+      - run: uv run pytest --cov=src --cov-fail-under=80
+{%- endif %}
+
+{%- if include_frontend %}
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: {{ node_version }}
+          cache: pnpm
+          cache-dependency-path: frontend/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --audit-level high
+      - run: pnpm lint
+      - run: pnpm typecheck
+      - run: pnpm test:run --coverage
+      - run: pnpm build
+{%- endif %}

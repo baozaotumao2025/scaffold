@@ -1,0 +1,185 @@
+---
+paths:
+  - "agent/**"
+---
+
+# Agent 服务总览
+
+Agent 服务的职责、技术栈、目录结构、配置{% if llm_provider == 'gemini-cli' %}、Skill 安装{% endif %}与测试规范。
+
+## 概览（职责）
+
+FastAPI 服务（port {{ agent_port }}）。核心职责：{% if llm_provider == 'gemini-cli' %}PTY 桥接 LLM CLI 交互式会话{% else %}通过 SDK 调用 LLM API{% endif %} + DAG 编排（对话 → 风格预览 → 生成 → 截图 → 合成）+ 事件流式推送给 Backend。
+
+## 技术栈
+
+| 库 | 用途 |
+|----|------|
+| FastAPI + uvicorn | WebSocket 服务端 |
+{% if llm_provider == 'gemini-cli' -%}
+| pty（标准库） | 伪终端，让 LLM CLI 认为自己在真实终端 |
+| asyncio | 异步 I/O，协调 PTY 读写与 WebSocket |
+{% elif llm_provider == 'openai-api' -%}
+| openai | OpenAI SDK，流式生成（`AsyncOpenAI`） |
+| asyncio | 异步 I/O，协调 SDK 调用与 WebSocket |
+{% elif llm_provider == 'anthropic-api' -%}
+| anthropic | Anthropic SDK，流式生成（`AsyncAnthropic`） |
+| asyncio | 异步 I/O，协调 SDK 调用与 WebSocket |
+{% else -%}
+| asyncio | 异步 I/O，协调 LLM 调用与 WebSocket |
+{% endif -%}
+| playwright（async） | 截取每页幻灯片截图 |
+| python-pptx | 合成 PPTX |
+| loguru | 结构化日志 |
+| pytest + pytest-asyncio | 测试 |
+
+## 包管理（uv）
+
+```bash
+# 添加依赖
+{% if llm_provider == 'gemini-cli' -%}
+uv add fastapi uvicorn playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+{% elif llm_provider == 'openai-api' -%}
+uv add fastapi uvicorn openai playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+{% elif llm_provider == 'anthropic-api' -%}
+uv add fastapi uvicorn anthropic playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+{% else -%}
+uv add fastapi uvicorn playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+{% endif %}
+# 安装 Playwright 浏览器（首次）
+uv run playwright install chromium
+
+# 运行服务
+uv run python -m src.main
+
+# 运行测试
+uv run pytest
+```
+
+关键文件：`pyproject.toml`（依赖声明）、`uv.lock`（锁文件，必须提交 git）
+
+## 数据库
+
+**Agent 不操作数据库，不引入 SQLAlchemy / Alembic。**
+
+Agent 是无状态处理服务。DB 由 Backend 单一持有。checkpoint 信息由 Backend 在 WebSocket 建连时作为参数传入，Agent 只读取，不写入任何持久化存储。
+
+## 目录结构（clean-arch）
+
+```
+agent/
+├── src/
+│   ├── main.py                  # 接口适配器：FastAPI app，WebSocket 端点
+│   │
+│   ├── domain/                  # 领域层：纯逻辑零 IO
+│   │   ├── models.py
+│   │   ├── state.py             # 聚合根状态
+│   │   ├── ports.py             # 端口定义（LLMSession、Exporter 等）
+│   │   └── exceptions.py
+│   │
+│   ├── dag/                     # 应用层：用例编排
+│   │   ├── nodes.py
+│   │   └── runner.py
+│   │
+│   ├── llm/                     # 扩展点①：LLMSession 适配器
+{% if llm_provider == 'gemini-cli' -%}
+│   │   ├── pty_bridge.py        # 共享 PTY 机制
+│   │   └── gemini_cli.py        # GeminiCliSession 实现
+{% elif llm_provider == 'openai-api' -%}
+│   │   └── openai_api.py        # OpenAISession 实现
+{% elif llm_provider == 'anthropic-api' -%}
+│   │   └── anthropic_api.py     # AnthropicSession 实现
+{% else -%}
+│   │   └── custom_llm.py        # 自定义 LLMSession 实现
+{% endif -%}
+│   │   └── registry.py
+│   ├── providers/               # 扩展点②：ImageProvider 适配器
+│   │   └── registry.py
+│   ├── export/                  # 扩展点③：Exporter 适配器
+│   │   └── pptx_exporter.py
+│   ├── storage/                 # 扩展点④：StorageBackend 适配器
+│   │   └── local_storage.py
+{% if llm_provider == 'gemini-cli' -%}
+│   ├── skills/
+│   │   └── installer.py         # CLI skill 自动安装
+{% endif -%}
+│   ├── utils/
+{% if llm_provider == 'gemini-cli' -%}
+│   │   ├── ansi.py              # ANSI 转义码过滤
+{% endif -%}
+│   │   ├── concurrency.py
+│   │   ├── files.py
+│   │   └── ids.py
+│   ├── middleware/
+│   └── core/
+│       ├── config.py
+│       └── logging.py
+└── tests/
+    ├── conftest.py
+{% if llm_provider == 'gemini-cli' -%}
+    ├── test_pty_bridge.py
+    ├── test_gemini_cli.py
+    ├── test_installer.py
+{% else -%}
+    ├── test_llm_session.py
+{% endif -%}
+    ├── test_nodes.py
+    └── test_runner.py
+```
+
+## 配置（core/config.py）
+
+```python
+class Settings(BaseSettings):
+    env: Literal["dev", "prod"] = "dev"
+    work_dir: Path = Path.home() / "{{ project_slug }}"
+    port: int = {{ agent_port }}
+    log_level: str = "DEBUG"
+{% if llm_provider == 'gemini-cli' %}
+    llm_cmd: str = "gemini"
+    skill_name: str = "frontend-slides"
+    skill_repo: str = ""           # 从 .env 注入
+    pty_read_buffer_size: int = 4096
+{% elif llm_provider == 'openai-api' %}
+    llm_api_key: str = ""          # 从 .env 注入，不硬编码
+    llm_model: str = "gpt-4o"
+    llm_base_url: str = ""         # 非空时覆盖 SDK 默认 endpoint
+{% elif llm_provider == 'anthropic-api' %}
+    llm_api_key: str = ""          # 从 .env 注入，不硬编码
+    llm_model: str = "claude-sonnet-4-6"
+    llm_base_url: str = ""
+{% else %}
+    llm_api_key: str = ""
+    llm_model: str = ""
+    llm_base_url: str = ""
+{% endif %}
+    generate_timeout_seconds: int = 300
+    preview_timeout_seconds: int = 180
+    dialog_timeout_seconds: int = 60
+    max_concurrent_sessions: int = 4
+    process_pool_workers: int = os.cpu_count() or 4
+
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+```
+{% if llm_provider == 'gemini-cli' %}
+## Skill 安装（skills/installer.py）
+
+Agent 启动时自动确保配置指定的 skill 已安装。`skill_name` 与 `skill_repo` 均来自 `Settings`，换 skill 只改 `.env`，不改代码。
+
+> 注意：安装目的地路径（`~/.gemini/skills/`）是 Gemini CLI 约定；换 CLI 时 `installer.py` 需同步修改。
+{% endif %}
+## 测试规范
+
+{% if llm_provider == 'gemini-cli' -%}
+- PTY 测试：mock `pty.openpty`、`os.read/write`，验证 ANSI 过滤和 HTML 检测
+- 超时测试：注入假 PTY 不输出，验证 `LLMTimeoutError` 被抛出
+- skill 安装测试：mock `git clone`，验证成功/失败分支
+{% else -%}
+- LLM session 测试：mock `LLMSession.generate` 返回 `AsyncIterator[str]`，验证流式处理
+- 超时测试：`generate` mock 为永不完成的迭代器，验证 `LLMTimeoutError` 被抛出
+{% endif -%}
+- DAG 节点测试：mock `send` 回调，验证状态转换和推送消息类型
+- checkpoint 恢复测试：
+  - 注入 `checkpoint={status: "done"}` → 验证直接推送结果，不启动 LLM
+  - 注入 `checkpoint={status: "screenshotting"}` → 验证跳过 LLM 直接进截图节点
+  - 注入 `checkpoint={status: "dialog"}` → 验证推送 `checkpoint_lost`

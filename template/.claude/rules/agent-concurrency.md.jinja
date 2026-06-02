@@ -1,0 +1,136 @@
+---
+paths:
+  - "agent/**"
+---
+
+# Agent 并发模型与资源管理
+
+事件驱动的异步 I/O、进程池下放 CPU 密集任务、并发上限背压、浏览器复用、生命周期取消、工作目录清理与日志规范。
+
+## 并发模型与资源管理
+
+Agent 是最重的并发场景：单进程 FastAPI（单事件循环）要同时服务多个会话，每个会话持有{% if llm_provider == 'gemini-cli' %}一个 LLM CLI 子进程 + {% endif %}一个 Chromium 上下文 + 阶段性 CPU 密集合成。**核心铁律：绝不阻塞事件循环。**
+
+### 工作类型与处理方式
+
+| 工作类型 | 例子 | 处理方式 |
+|---------|------|---------|
+| 异步 I/O | asyncio 子进程、网络、WebSocket | 直接 `await` |
+{% if llm_provider == 'gemini-cli' -%}
+| 阻塞 fd 读 | PTY master_fd 读取 | **非阻塞 fd + `loop.add_reader`**，不要 thread-per-session |
+{% endif -%}
+| CPU 密集 | python-pptx 合成、图像处理 | `ProcessPoolExecutor` via `run_in_executor` |
+{% if llm_provider != 'gemini-cli' -%}
+| LLM 流式 | SDK `async for token in stream` | 直接 `await`，事件驱动 |
+{% endif %}
+{% if llm_provider == 'gemini-cli' %}
+### 1. PTY 读取：事件驱动，零线程
+
+**不要**为每个会话开一个线程跑阻塞 `os.read`（线程池会被会话数打爆）。正确做法是把 master fd 设为非阻塞，注册到事件循环：
+
+```python
+os.set_blocking(master_fd, False)
+loop.add_reader(master_fd, on_pty_readable)   # 可读时回调，零额外线程
+
+def on_pty_readable():
+    try:
+        data = os.read(master_fd, 4096)
+    except BlockingIOError:
+        return
+    queue.put_nowait(strip_ansi(data.decode(errors="replace")))
+```
+
+清理时务必 `loop.remove_reader(master_fd)`。
+
+### 2. CPU 密集：进程池
+{% else %}
+### 1. CPU 密集：进程池
+{% endif %}
+
+`synthesize` 节点（python-pptx 合成）是纯 CPU + 持 GIL，会卡住整个事件循环 1–3 秒，影响所有其他会话。必须下放到进程池：
+
+```python
+process_pool = ProcessPoolExecutor(max_workers=os.cpu_count())
+
+await loop.run_in_executor(process_pool, build_pptx, screenshots_dir, pptx_path)
+```
+
+进程池函数必须是**纯函数**（参数 + 返回值可序列化），禁止访问共享状态。
+
+### {% if llm_provider == 'gemini-cli' %}3{% else %}2{% endif %}. 并发上限与背压
+
+每个会话 = {% if llm_provider == 'gemini-cli' %}1 个 CLI 进程 + {% endif %}1 个 Chromium context，内存/CPU 开销大。用全局信号量封顶，超出排队并向前端反馈位置：
+
+```python
+session_semaphore = asyncio.Semaphore(settings.max_concurrent_sessions)
+
+async with session_semaphore:
+    await run_session(...)
+# 排队期间向前端推 {"type": "queued", "position": N}
+```
+
+### {% if llm_provider == 'gemini-cli' %}4{% else %}3{% endif %}. Playwright 浏览器复用
+
+启动时拉起**一个** Chromium，每个会话开独立 `browser_context`（廉价），用完关 context，不要每次 `launch()`：
+
+```python
+# lifespan 启动
+app.state.browser = await playwright.chromium.launch()
+
+# 截图节点
+context = await app.state.browser.new_context(viewport={"width": 1920, "height": 1080})
+try:
+    page = await context.new_page()
+    ...
+finally:
+    await context.close()
+```
+
+### {% if llm_provider == 'gemini-cli' %}5{% else %}4{% endif %}. 资源生命周期与取消
+
+每个会话是一个 asyncio Task。WebSocket 断开 → 取消 Task → `finally` 块彻底清理：
+
+```python
+finally:
+{% if llm_provider == 'gemini-cli' %}
+    loop.remove_reader(master_fd)
+    proc.kill()
+    await proc.wait()          # 必须 wait，回收僵尸进程
+    os.close(master_fd)
+{% else %}
+    await llm_session.close()  # 释放 HTTP 连接
+{% endif %}
+    await context.close()
+```
+
+### 共享状态线程安全
+
+所有会话状态活在事件循环里——纯 async 访问无需锁。下放到进程池的函数**严禁触碰共享 dict**，只能通过参数传入、返回值传出。
+
+## 工作目录清理（后台任务）
+
+`lifespan` 启动定时任务（每小时），按 TTL + 磁盘预算清理 `~{{ '/' }}{{ project_slug }}/{uuid}/`：
+
+- 删除超 `SESSION_TTL_HOURS`（默认 24h）的会话目录
+- 总占用超 `MAX_DISK_GB`（默认 5GB）时按 LRU 删到阈值以下
+- 删除前校验路径在 work_dir 内（防穿越）
+
+## 日志规范（core/logging.py）
+
+使用 loguru，两个 sink：
+
+| Sink | 格式 | 条件 |
+|------|------|------|
+| stderr | 人类可读彩色格式 | 开发环境（`ENV=dev`） |
+| `~{{ '/' }}{{ project_slug }}/logs/agent.log` | JSON（每行一条） | 所有环境 |
+
+文件 sink 配轮转与保留：`rotation="100 MB"`、`retention="14 days"`、`compression="zip"`。
+
+每条日志必须携带 `session_id`（通过 loguru contextualize 注入）：
+
+```python
+with logger.contextualize(session_id=state.session_id):
+    logger.info("session started")
+```
+
+**禁止使用 `print()`，禁止使用 stdlib `logging`。统一用 `from loguru import logger`。**

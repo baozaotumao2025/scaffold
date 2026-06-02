@@ -1,6 +1,32 @@
-# scaffold
+# scaffold · new-project skill
 
-基于 [Copier](https://copier.readthedocs.io/) 的工程脚手架，一键生成含完整质量门禁的 FastAPI + React 项目，并随选型自动定制 Claude Code 约束规则。
+> 一个 **Claude Code Skill**：在任意项目里对 Claude 说一句"帮我新建项目"，即可生成含完整质量门禁（pre-commit、CI、Docker、Claude 规则）的 FastAPI + React 工程骨架，并随选型自动裁剪规则文件。
+
+## 🚀 安装（推荐）
+
+一条命令装到全局，**任意项目可用**，无需克隆本仓库：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/baozaotumao2025/scaffold/main/scripts/install-skill.sh | bash
+```
+
+## 用法
+
+安装后，在 Claude Code 中任选一种方式：
+
+```
+/new-project                          # 交互式问卷，逐步选服务/数据库
+/new-project my-app                   # 指定项目名，其余交互确认
+/new-project my-rules --preset principles   # 仅生成 10 个原理层规则，无服务代码
+```
+
+或者**直接用自然语言**——Claude 会自动识别并触发 skill：
+
+> 「帮我新建一个全栈项目，要 FastAPI + React，数据库用 postgresql」
+
+可用 preset：`principles`（仅规则）· `fullstack` · `fullstack-ai` · `api-only`。
+
+> 模板由 copier 从 GitHub 实时拉取。`verify.sh` 在仓库根 `scripts/` 单一维护，安装时由 `install-skill.sh` 组装进 skill，使安装后的 skill 自包含。
 
 ---
 
@@ -45,8 +71,11 @@ include_frontend=false         →  所有 frontend*.md 排除
 scaffold/
 ├── copier.yml                           ← 问卷变量 + 条件排除逻辑
 ├── README.md
+├── .claude/skills/new-project/
+│   └── SKILL.md                         ← skill 元数据 + 生成指令（verify.sh 安装时组装）
 ├── scripts/
-│   ├── verify.sh                        ← 工具链合规检查（幂等只读）
+│   ├── verify.sh                        ← 工具链合规检查（幂等只读，单一源）
+│   ├── install-skill.sh                 ← 把 skill 安装到 ~/.claude/skills/
 │   └── retrofit.sh                      ← 补装工具链到已有项目
 └── template/
     ├── .pre-commit-config.yaml.jinja    ← 按服务条件生成 hooks
@@ -77,20 +106,20 @@ scaffold/
 
 ---
 
-## 前置依赖
+## 进阶：不装 skill，直接用 copier
+
+> 以下面向 CI、脚本，或不使用 Claude Code 的场景。日常使用推荐上面的 skill 方式。
+
+前置依赖：
 
 ```bash
 pip install copier        # 或 uv tool install copier
 ```
 
----
-
-## 生成新项目
-
-### 交互式问卷（推荐首次使用）
+### 交互式问卷
 
 ```bash
-copier copy git+https://github.com/your-org/scaffold.git my-new-project
+copier copy git+https://github.com/baozaotumao2025/scaffold.git my-new-project
 ```
 
 问卷包含以下选择：
@@ -118,7 +147,7 @@ copier copy git+https://github.com/your-org/scaffold.git my-new-project
 
 ```bash
 # 全栈 + OpenAI API + PostgreSQL
-copier copy git+https://github.com/your-org/scaffold.git my-project \
+copier copy git+https://github.com/baozaotumao2025/scaffold.git my-project \
   --data project_name="My Service" \
   --data include_backend=true \
   --data include_agent=true \
@@ -127,7 +156,7 @@ copier copy git+https://github.com/your-org/scaffold.git my-project \
   --data llm_provider=openai-api
 
 # 仅 API（backend only，SQLite）
-copier copy git+https://github.com/your-org/scaffold.git my-api \
+copier copy git+https://github.com/baozaotumao2025/scaffold.git my-api \
   --data include_backend=true \
   --data include_agent=false \
   --data include_frontend=false
@@ -234,7 +263,7 @@ Claude 规则文件          18      0      0
       --scaffold URL  指定 scaffold 来源（覆盖 $SCAFFOLD_URL）
 
 环境变量：
-  SCAFFOLD_URL        scaffold 来源（默认：git+https://github.com/your-org/scaffold.git）
+  SCAFFOLD_URL        scaffold 来源（默认：git+https://github.com/baozaotumao2025/scaffold.git）
 ```
 
 ```bash
@@ -248,7 +277,7 @@ Claude 规则文件          18      0      0
 SCAFFOLD_URL=./scaffold ./scripts/retrofit.sh /path/to/project
 
 # 使用远程 scaffold，仅运行 copier（跳过 uv/pnpm）
-./scripts/retrofit.sh --scaffold git+https://github.com/your-org/scaffold.git --no-deps .
+./scripts/retrofit.sh --scaffold git+https://github.com/baozaotumao2025/scaffold.git --no-deps .
 
 # 补装后立即验证
 ./scripts/retrofit.sh . && ./scripts/verify.sh .
@@ -310,10 +339,10 @@ copier copy ./scaffold /tmp/test-api \
 ## 发布到团队
 
 ```bash
-cd /Users/maxta/Downloads/scaffold
+cd my-scaffold
 git init && git add . && git commit -m "chore: initial scaffold"
 
-git remote add origin git@github.com:your-org/scaffold.git
+git remote add origin git@github.com:baozaotumao2025/scaffold.git
 git push -u origin main
 
 # 打版本 tag（copier update 按 tag 追踪）
@@ -324,7 +353,7 @@ git tag v1.0.0 && git push --tags
 
 ```bash
 pip install copier
-copier copy git+https://github.com/your-org/scaffold.git my-project
+copier copy git+https://github.com/baozaotumao2025/scaffold.git my-project
 ```
 
 ---

@@ -1,0 +1,156 @@
+_templates_suffix: .jinja
+
+_skip_if_exists:
+  - "backend/src/**"
+  - "agent/src/**"
+  - "frontend/src/**"
+  - "**/.env"
+
+_exclude:
+  - copier.yml
+  # ── 服务目录 ──────────────────────────────────────────────────────────────
+  - "{% if not include_backend %}backend{% endif %}"
+  - "{% if not include_agent %}agent{% endif %}"
+  - "{% if not include_frontend %}frontend{% endif %}"
+  # ── Backend 规则（仅 include_backend=true 时复制）──────────────────────
+  - "{% if not include_backend %}.claude/rules/backend.md{% endif %}"
+  - "{% if not include_backend %}.claude/rules/backend-db.md.jinja{% endif %}"
+  - "{% if not include_backend %}.claude/rules/backend-concurrency.md{% endif %}"
+  # ── Agent 规则（仅 include_agent=true 时复制）────────────────────────────
+  - "{% if not include_agent %}.claude/rules/agent.md.jinja{% endif %}"
+  - "{% if not include_agent %}.claude/rules/agent-dag.md{% endif %}"
+  - "{% if not include_agent %}.claude/rules/agent-concurrency.md.jinja{% endif %}"
+  - "{% if not include_agent %}.claude/rules/agent-extension-points.md{% endif %}"
+  # LLM 驱动层：按 llm_provider 只保留对应变体
+  - "{% if not include_agent or llm_provider != 'gemini-cli' %}.claude/rules/agent-llm-pty.md{% endif %}"
+  - "{% if not include_agent or llm_provider == 'gemini-cli' %}.claude/rules/agent-llm-api.md{% endif %}"
+  # ── Frontend 规则（仅 include_frontend=true 时复制）──────────────────────
+  - "{% if not include_frontend %}.claude/rules/frontend.md{% endif %}"
+  - "{% if not include_frontend %}.claude/rules/frontend-runtime.md{% endif %}"
+  # ── 跨服务规则 ────────────────────────────────────────────────────────────
+  # data-lifecycle: agent 产生文件，backend 清理 DB，两者都有才有意义
+  - "{% if not (include_backend and include_agent) %}.claude/rules/data-lifecycle.md{% endif %}"
+  # communication-catalog: 描述服务间 WS 消息，单服务时无跨层通信
+  - "{% if not (include_backend or include_agent) or not (include_agent or include_frontend) %}.claude/rules/communication-catalog.md{% endif %}"
+
+_tasks:
+  - command: git init
+  - command: git add .
+  - command: "git commit -m 'chore: initialize project from scaffold'"
+  - command: uv sync
+    working_directory: backend
+    when: "{{ include_backend }}"
+  - command: uv sync
+    working_directory: agent
+    when: "{{ include_agent }}"
+  - command: pnpm install
+    working_directory: frontend
+    when: "{{ include_frontend }}"
+  - command: "pre-commit install && pre-commit install --hook-type commit-msg"
+
+# ── 项目基本信息 ────────────────────────────────────────────────────────
+project_name:
+  type: str
+  help: 项目显示名称（用于文档、README）
+  default: My Awesome Service
+
+project_slug:
+  type: str
+  help: 项目 slug（snake_case，用于包名、目录名）
+  default: "{{ project_name | lower | replace(' ', '_') | replace('-', '_') }}"
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9_]*$')) %}
+    project_slug 只能包含小写字母、数字和下划线，且以字母开头
+    {% endif %}
+
+org_name:
+  type: str
+  help: GitHub 组织 / 用户名（用于仓库 URL）
+  default: my-org
+
+description:
+  type: str
+  help: 项目一行描述
+  default: "{{ project_name }}"
+
+# ── 服务选择（条件包含） ────────────────────────────────────────────────
+include_backend:
+  type: bool
+  help: 包含 Python FastAPI backend 服务？
+  default: true
+
+include_agent:
+  type: bool
+  help: 包含 Python LLM Agent 服务？
+  default: false
+
+include_frontend:
+  type: bool
+  help: 包含 React + Vite + TypeScript 前端？
+  default: true
+
+# ── 端口配置 ────────────────────────────────────────────────────────────
+backend_port:
+  type: int
+  help: Backend 服务端口
+  default: 8000
+  when: "{{ include_backend }}"
+
+agent_port:
+  type: int
+  help: Agent 服务端口
+  default: 8001
+  when: "{{ include_agent }}"
+
+frontend_port:
+  type: int
+  help: 前端开发服务器 / 容器暴露端口
+  default: 5173
+  when: "{{ include_frontend }}"
+
+# ── Python 配置 ──────────────────────────────────────────────────────────
+python_version:
+  type: str
+  help: Python 版本
+  default: "3.12"
+  choices:
+    - "3.11"
+    - "3.12"
+    - "3.13"
+
+database:
+  type: str
+  help: 数据库类型
+  default: sqlite
+  choices:
+    - sqlite
+    - postgresql
+  when: "{{ include_backend }}"
+
+# ── 前端配置 ─────────────────────────────────────────────────────────────
+node_version:
+  type: str
+  help: Node.js 版本（CI 使用）
+  default: "22"
+  choices:
+    - "20"
+    - "22"
+  when: "{{ include_frontend }}"
+
+# ── LLM 配置（Agent 专属） ───────────────────────────────────────────────
+llm_provider:
+  type: str
+  help: LLM 提供商
+  default: gemini-cli
+  choices:
+    - gemini-cli
+    - openai-api
+    - anthropic-api
+    - custom
+  when: "{{ include_agent }}"
+
+llm_cmd:
+  type: str
+  help: LLM CLI 命令（留空则按 provider 默认）
+  default: "{% if llm_provider == 'gemini-cli' %}gemini{% elif llm_provider == 'openai-api' %}openai{% else %}llm{% endif %}"
+  when: "{{ include_agent }}"
