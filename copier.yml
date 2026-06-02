@@ -8,10 +8,9 @@ _skip_if_exists:
   - "agent/src/**"
   - "frontend/src/**"
   - "**/.env"
-  # 编辑器配置：已有则保留用户自己的，不覆盖（新项目仍会生成）
-  - ".vscode/settings.json"
-  - ".vscode/extensions.json"
-  - ".vscode/tasks.json"
+  # 注：.vscode/* 故意不列入此处。它们是团队级规则（个人偏好在 VSCode 全局配置，
+  # 不受影响），随 scaffold 演进——copier update 会 3-way 合并推送改进，
+  # 仅当用户改了同一行才提示冲突。
 
 _exclude:
   - copier.yml
