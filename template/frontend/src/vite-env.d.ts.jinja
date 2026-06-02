@@ -1,12 +1,11 @@
 /// <reference types="vite/client" />
-
+{% if include_backend %}
 interface ImportMetaEnv {
-{%- if include_backend %}
   readonly VITE_BACKEND_WS_URL: string;
   readonly VITE_BACKEND_HTTP_URL: string;
-{%- endif %}
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+{%- endif %}
