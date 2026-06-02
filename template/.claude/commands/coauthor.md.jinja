@@ -1,0 +1,25 @@
+设置本项目提交是否包含 Claude 署名（`Co-Authored-By: Claude`）。
+
+参数：$ARGUMENTS
+
+## 行为
+
+按参数运行开关脚本并回报结果（参数为空时默认 `status`）：
+
+```bash
+./scripts/claude-attribution.sh <on|off|status>
+```
+
+- `off` —— 提交移除 Claude 署名（**默认**）
+- `on` —— 提交保留 Claude 署名
+- `status` —— 查看当前策略
+
+## 步骤
+
+1. 解析参数为 `on` / `off` / `status` 之一；无参或无法识别时用 `status`。
+2. 运行 `./scripts/claude-attribution.sh <参数>`，把输出原样回报给用户。
+3. 一句话说明：策略存于 `git config scaffold.includeClaude`，**仅本项目生效**；由 commit-msg 门禁（pre-commit）每次提交强制执行——`off` 时自动剥除任何 Claude 署名行。
+
+## 注意
+- 只改本项目设置，不碰其它项目、不碰全局。
+- 不要手改 `.pre-commit-config.yaml` 或门禁脚本来达到目的——用本命令切换即可。

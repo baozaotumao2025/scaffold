@@ -113,7 +113,17 @@ domain/(实体+值对象+端口 Protocol) → application/services → infrastru
 
 ## Claude 署名策略（每个生成项目自带）
 
-控制提交信息里是否包含 `Co-Authored-By: Claude` 署名。**默认 off（不含）**，由 commit-msg 门禁每次提交强制执行。
+控制提交信息里是否包含 `Co-Authored-By: Claude` 署名。**默认 off（不含）**，由 commit-msg 门禁每次提交强制执行。仅本项目生效。
+
+在 Claude Code 里（项目自带斜杠命令，打 `/` 即可找到）：
+
+```
+/coauthor status   # 查看当前策略
+/coauthor off      # 不含署名（默认）
+/coauthor on       # 保留署名
+```
+
+或在终端直接用脚本（CI / 不用 Claude 时）：
 
 ```bash
 ./scripts/claude-attribution.sh status   # 查看当前策略
@@ -178,7 +188,8 @@ scaffold/
     │   ├── claude-attribution.sh        ← 开关：本项目提交是否含 Claude 署名（默认 off）
     │   └── check-claude-attribution.sh  ← commit-msg 门禁：按开关移除/保留署名
     ├── .claude/commands/
-    │   └── new-feature.md.jinja         ← 项目内命令：按规则引导生成功能分层代码
+    │   ├── new-feature.md.jinja         ← 项目内命令：按规则引导生成功能分层代码
+    │   └── coauthor.md.jinja            ← 项目内命令：/coauthor 切换 Claude 署名开关
     ├── .claude/rules/
     │   ├── # 原理层（10 个，静态，始终复制）
     │   ├── architecture.md / ddd.md / design-discipline.md ...
