@@ -1,0 +1,5 @@
+# pnpm 10+ 默认拦截依赖的构建脚本（供应链安全）。
+# allowBuilds 显式放行确需构建的包，避免 ERR_PNPM_IGNORED_BUILDS 致 install 非零退出。
+# pnpm 11 用 allowBuilds 取代已废弃的 onlyBuiltDependencies。
+allowBuilds:
+  esbuild: true

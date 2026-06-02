@@ -11,6 +11,12 @@ repos:
       - id: check-added-large-files
       - id: detect-private-key
 
+  # 密钥扫描（防密钥误入库，配合 detect-private-key）
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.21.2
+    hooks:
+      - id: gitleaks
+
   # 提交信息规范（Conventional Commits）
   - repo: https://github.com/compilerla/conventional-pre-commit
     rev: v3.4.0

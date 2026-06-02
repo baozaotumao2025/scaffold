@@ -49,7 +49,11 @@ _tasks:
   - command: pnpm install
     working_directory: frontend
     when: "{{ include_frontend }}"
-  - command: "pre-commit install && pre-commit install --hook-type commit-msg"
+  # 未安装 pre-commit 时跳过而非让生成失败（退出码恒 0）
+  - command: >-
+      command -v pre-commit >/dev/null 2>&1
+      && pre-commit install && pre-commit install --hook-type commit-msg
+      || echo '⚠ 未检测到 pre-commit，已跳过钩子安装；请先安装后手动运行：pre-commit install'
 
 # ── 项目基本信息 ────────────────────────────────────────────────────────
 project_name:
