@@ -141,9 +141,11 @@ scaffold/
 ├── README.md
 ├── .claude/skills/new-project/
 │   └── SKILL.md                         ← skill 元数据 + 生成指令（verify.sh 安装时组装）
+├── .github/workflows/docs-check.yml     ← scaffold 自身 CI：防 README 与 template 漂移
 ├── scripts/
 │   ├── verify.sh                        ← 工具链合规检查（幂等只读，单一源）
 │   ├── install-skill.sh                 ← 把 skill 安装到 ~/.claude/skills/
+│   ├── check-docs.sh                    ← 校验 README 覆盖 template 架构基座目录
 │   └── retrofit.sh                      ← 补装工具链到已有项目
 └── template/
     ├── .copier-answers.yml.jinja        ← 记录模板版本+答案，供 copier update

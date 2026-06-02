@@ -1,0 +1,28 @@
+name: docs-check
+
+# scaffold 仓库自身的 CI（区别于 template/.github/ 那份——那是生成项目用的）。
+# 防止 README 文档随 template/ 结构改动而漂移。
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "template/**"
+      - "README.md"
+      - "scripts/check-docs.sh"
+  pull_request:
+    paths:
+      - "template/**"
+      - "README.md"
+      - "scripts/check-docs.sh"
+
+jobs:
+  docs-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: 校验 README 与 template 结构同步
+        run: bash scripts/check-docs.sh
+      - name: 脚本语法检查
+        run: |
+          for s in scripts/*.sh; do bash -n "$s"; done
