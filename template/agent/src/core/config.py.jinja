@@ -1,0 +1,39 @@
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """Agent 配置。
+
+    字段 snake_case 自动映射 .env 的 SCREAMING_SNAKE，无需 alias_generator
+    （见 .claude/rules/config.md）。
+    """
+
+    env: str = "dev"
+    port: int = {{ agent_port }}
+    log_level: str = "INFO"
+    enable_api_docs: bool = True
+    work_dir: str = "~/{{ project_slug }}"
+{%- if llm_provider == 'gemini-cli' %}
+    llm_cmd: str = "{{ llm_cmd }}"
+    max_concurrent_sessions: int = 4
+{%- elif llm_provider == 'openai-api' %}
+    openai_api_key: str = ""
+    openai_model: str = "gpt-4o"
+{%- elif llm_provider == 'anthropic-api' %}
+    anthropic_api_key: str = ""
+    anthropic_model: str = "claude-sonnet-4-6"
+{%- else %}
+    llm_cmd: str = "{{ llm_cmd }}"
+{%- endif %}
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """单例配置，启动即校验类型，fail-fast。"""
+    return Settings()

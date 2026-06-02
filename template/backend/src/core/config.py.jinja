@@ -1,0 +1,35 @@
+from functools import lru_cache
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class Settings(BaseSettings):
+    """应用配置。
+
+    字段为 snake_case，自动映射 .env 的 SCREAMING_SNAKE（如 ``port`` ↔ ``PORT``），
+    无需自定义 alias_generator——详见 .claude/rules/config.md。
+    """
+
+    env: str = "dev"
+    port: int = {{ backend_port }}
+    log_level: str = "INFO"
+    enable_api_docs: bool = True
+    work_dir: str = "~/{{ project_slug }}"
+{%- if include_agent %}
+    agent_ws_url: str = "ws://localhost:{{ agent_port }}"
+{%- endif %}
+{%- if database == 'sqlite' %}
+    database_url: str = "sqlite+aiosqlite:///~/{{ project_slug }}/{{ project_slug }}.db"
+{%- elif database == 'postgresql' %}
+    database_url: str = "postgresql+asyncpg://user:password@localhost:5432/{{ project_slug }}"
+{%- endif %}
+
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """单例配置，启动即校验类型，fail-fast。"""
+    return Settings()

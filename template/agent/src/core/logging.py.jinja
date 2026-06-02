@@ -1,0 +1,12 @@
+import sys
+
+from loguru import logger
+
+
+def configure_logging(level: str = "INFO") -> None:
+    """配置 loguru：结构化日志、单一 stderr sink。
+
+    生产可改 serialize=True 输出 JSON、或加文件 sink（见 .claude/rules/observability.md）。
+    """
+    logger.remove()
+    logger.add(sys.stderr, level=level.upper(), backtrace=False, diagnose=False)
