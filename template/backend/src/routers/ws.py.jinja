@@ -1,0 +1,23 @@
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from loguru import logger
+
+router = APIRouter()
+
+
+@router.websocket("/ws/{session_id}")
+async def ws_endpoint(ws: WebSocket, session_id: str) -> None:
+    """WebSocket 接入点（骨架）。
+
+    架构定位：Backend 是 WS 代理层{% if include_agent %}，转发 Browser ↔ Agent{% endif %}。
+    功能开发时在此接入会话服务{% if include_agent %} / Agent 转发{% endif %}，
+    见 .claude/rules/backend.md、communication-protocol.md。
+    """
+    await ws.accept()
+    logger.info("ws connected | session_id={}", session_id)
+    try:
+        while True:
+            msg = await ws.receive_json()
+            # TODO: 校验信封 → 分发命令 → 回推事件（见 communication-catalog.md）
+            await ws.send_json({"type": "ack", "received": msg.get("type")})
+    except WebSocketDisconnect:
+        logger.info("ws disconnected | session_id={}", session_id)

@@ -1,0 +1,55 @@
+from collections.abc import AsyncGenerator
+
+{% if database == 'sqlite' -%}
+from sqlalchemy import event
+{% endif -%}
+from sqlalchemy.ext.asyncio import (
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
+from sqlalchemy.orm import DeclarativeBase
+
+from ...core.config import get_settings
+
+settings = get_settings()
+
+
+class Base(DeclarativeBase):
+    """所有 ORM 模型的声明基类。"""
+
+
+engine = create_async_engine(
+    settings.database_url,
+    echo=settings.env == "dev",
+{%- if database == 'sqlite' %}
+    connect_args={"check_same_thread": False},
+{%- elif database == 'postgresql' %}
+    pool_size=10,
+    max_overflow=20,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+{%- endif %}
+)
+{% if database == 'sqlite' %}
+
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragma(dbapi_conn: object, _: object) -> None:
+    cursor = dbapi_conn.cursor()  # type: ignore[attr-defined]
+    cursor.execute("PRAGMA journal_mode=WAL")    # 读写不互斥
+    cursor.execute("PRAGMA busy_timeout=5000")   # 锁等待 5s 而非立即报错
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+{% endif %}
+AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
+
+
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """请求级会话：提交/回滚由本依赖统一管理。"""
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
