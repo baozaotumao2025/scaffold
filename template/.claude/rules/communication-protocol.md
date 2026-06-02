@@ -11,8 +11,8 @@
 
 ## 交互范式：异步事件驱动 + 命令/事件分离（CQRS 式消息）
 
-- **命令（Command）**：客户端→服务端，表达*意图*，可被拒绝（`start_session` / `user_input` / `style_pick`）
-- **事件（Event）**：服务端→客户端，陈述*已发生的事实*，单向广播（`gemini_message` / `style_preview` / `html_ready` / `done` / `error`）
+- **命令（Command）**：客户端→服务端，表达*意图*，可被拒绝（示范：`start_session` / `create_order` / `submit_order`）
+- **事件（Event）**：服务端→客户端，陈述*已发生的事实*，单向广播（示范：`order_created` / `item_priced` / `order_confirmed` / `done` / `error`）
 - 命令与事件语义不混用
 
 ### 命令幂等（Idempotency，强制）
@@ -20,7 +20,7 @@
 投递是 at-most-once，但断连/重连/前端重发会让同一命令到达多次，故**所有命令必须可安全重复执行**——重复执行的副作用等价于执行一次。这是命令的**后置条件契约**（属 DbC，见 `design-discipline.md`），非可选优化。
 
 - **幂等键**：命令以 `correlation_id` 作幂等键去重；服务端对已处理的 `correlation_id` 直接回放上次结果，不重复触发副作用（不重复起会话 / 不重复扣资源 / 不重复落库）。
-- **天然幂等优先**：能用「设置为目标态」就不用「增量变更」。`style_pick` 是选定某态（幂等）✅；任何"追加一次""+1"式语义需显式去重。
+- **天然幂等优先**：能用「设置为目标态」就不用「增量变更」。`submit_order`（置为已提交态）是幂等 ✅；任何"追加一次""+1"式语义需显式去重。
 - **REST 幂等**：`/download` `/preview` 为只读 GET，天然幂等可重试可缓存（见传输层选型）。
 - **校验点**：命令处理入口先查幂等键，再执行；新增命令时在 PR 说明其幂等策略（天然幂等 / 键去重）。
 
@@ -31,7 +31,7 @@
 ```json
 {
   "v": 1,                       // 协议版本
-  "type": "style_preview",      // 判别式
+  "type": "order_created",      // 判别式
   "correlation_id": "uuid",     // 全链路追踪 id
   "ts": "2026-05-31T08:00:00Z", // 发出时间（ISO-8601）
   "payload": { ... }            // 与 type 对应的强类型体

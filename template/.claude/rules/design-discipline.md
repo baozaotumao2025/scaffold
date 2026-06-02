@@ -7,7 +7,7 @@
 ## 六边形架构（Ports & Adapters）
 
 - **端口（Port）**：领域定义的接口（`LLMSession` / `ImageProvider` / `Exporter` / `StorageBackend`），表达"领域需要什么能力"
-- **适配器（Adapter）**：端口的具体实现（当前 LLM CLI 适配器 / `pptx_exporter` …），位于最外层，可替换
+- **适配器（Adapter）**：端口的具体实现（当前 LLM CLI 适配器 / 示范导出器 …），位于最外层，可替换
 - 依赖方向恒指向领域；替换外层实现不触动内层
 
 ## SOLID（类/模块级强制）
@@ -55,11 +55,13 @@
 
 系统预留以下接口，保证可扩展性。新增同类能力 = 新增一个实现，**不改调用方**。端口统一声明于 `agent/domain/ports.py`（六边形架构：端口属领域核心）；适配器实现散于对应目录。
 
+下表端口为**示范**（含一个 LLM 端口 + 三个通用外部能力端口）；按项目实际需要增删：
+
 | 扩展点（端口） | 当前适配器 | 适配器位置 | 未来扩展 |
 |--------|---------|---------|---------|
 | `LLMSession` | 当前 CLI 厂商适配器 | `agent/llm/` | 其他 CLI / API SDK |
-| `ImageProvider` | unsplash / pexels / none | `agent/providers/` | 自建图库 / AI 生图 |
-| `Exporter` | `pptx_exporter` | `agent/export/` | pdf_exporter / 长图 |
+| `PaymentGateway` | 示范支付适配器 / none | `agent/providers/` | 接入真实支付网关 |
+| `Exporter` | 示范导出器（如 PDF） | `agent/export/` | 其他格式 |
 | `StorageBackend` | `local_storage`（本地 FS） | `agent/storage/` | S3 / OSS |
 
 每个端口都是 `Protocol`，新适配器注册到工厂（`registry`）即生效，调用方按配置选择。具体端口签名与注册规范见 `agent.md`。
@@ -93,28 +95,28 @@ class BadSession:
 
 ## 可靠性纪律（Resilience，强制）
 
-核心链路全是易抖动的外部依赖（LLM CLI 进程 / Chromium 截图 / 图床 HTTP），故跨边界调用必须假定**会超时、会瞬时失败、会被重复触发**。以下与「命令幂等」（见 `communication-protocol.md`）同属可靠性约束，从设计之初遵循，不允许"先实现再加兜底"。
+核心链路常含易抖动的外部依赖（LLM CLI 进程 / 第三方 API / 外部 HTTP 服务），故跨边界调用必须假定**会超时、会瞬时失败、会被重复触发**。以下与「命令幂等」（见 `communication-protocol.md`）同属可靠性约束，从设计之初遵循，不允许"先实现再加兜底"。
 
 1. **超时无处不在（Ubiquitous Timeout）**
    任何跨进程/网络/IO 的等待**必须设显式超时**，禁止裸 `await` 无界等待。
-   - 外部调用统一用 `asyncio.timeout(...)` 或客户端原生 timeout 包裹；超时即抛领域错误（如 `GEMINI_TIMEOUT`），不静默挂起。
+   - 外部调用统一用 `asyncio.timeout(...)` 或客户端原生 timeout 包裹；超时即抛领域错误（如 `EXTERNAL_SERVICE_TIMEOUT`），不静默挂起。
    - 超时值经 `.env` 注入、不硬编码（见 `config.md`）；每类外部依赖一个超时配置项。
    - 反例：`await proc.read()` 无超时 → 进程卡死则会话永久僵死。
 
 2. **重试 + 指数退避 + 抖动（Retry / Backoff + Jitter）**
-   对**幂等**操作的瞬时失败（网络抖动、图床 5xx、截图偶发失败）才允许重试；非幂等操作禁止盲目重试。
+   对**幂等**操作的瞬时失败（网络抖动、第三方 5xx、外部调用偶发失败）才允许重试；非幂等操作禁止盲目重试。
    - 重试须有**上限**（次数 + 总时长双封顶），退避用指数 + 随机抖动，禁固定间隔猛刷。
    - 重试逻辑收拢为一处可复用策略（如 `utils/retry.py`），不在各调用点散写循环。
    - 用户输入触发的命令依赖幂等键去重（见 `communication-protocol.md`），保证重试安全。
 
 3. **降级而非整体失败（Graceful Degradation）**
-   单个可选能力失败时，**降级到退化态**而非让整条生成链崩溃。
-   - 经端口的退化实现承接：`ImageProvider` 失败/超额 → 降级到 `none`（无图）继续生成，而非中断 Deck。
+   单个可选能力失败时，**降级到退化态**而非让整条主链崩溃。
+   - 经端口的退化实现承接：某可选外部能力失败/超额 → 降级到 `none`（跳过该能力）继续主流程，而非中断整笔业务。
    - 降级须**可观测**：记日志 + 必要时以事件告知前端（区别于 `error` 致命错误）。
    - 哪些能力可降级、降级到何种退化态，在端口契约里显式声明。
 
 4. **边界校验，内部信任（Validate at Boundary）**
-   不可信输入（前端命令、上传 `.md`、外部响应）在**适配器/路由边界一次性校验**（Pydantic / 类型 / 业务规则），校验失败回 `INVALID_INPUT`；越过边界进入领域后**信任已校验**，领域内不重复防御性判空。
+   不可信输入（前端命令、上传文件、外部响应）在**适配器/路由边界一次性校验**（Pydantic / 类型 / 业务规则），校验失败回 `INVALID_INPUT`；越过边界进入领域后**信任已校验**，领域内不重复防御性判空。
    - 校验是边界职责，不是领域职责——领域用前置条件断言不变量，而非兜外部脏数据。
 
 5. **资源管理强制（RAII / Context Manager）**

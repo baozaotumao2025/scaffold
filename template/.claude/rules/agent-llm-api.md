@@ -75,33 +75,32 @@ Anthropic 适配器同理，将 `AsyncOpenAI` 换为 `AsyncAnthropic`，流式 A
 ## DAG 节点中的调用模式
 
 ```python
-async def phase3_generate(state, send, recv_queue):
+async def process(state, send, recv_queue):
     try:
-        async with asyncio.timeout(settings.generate_timeout_seconds):
+        async with asyncio.timeout(settings.process_timeout_seconds):
             chunks: list[str] = []
             async for token in llm_session.generate(state.messages):
                 chunks.append(token)
                 await send({"type": "llm_token", "text": token})
-            html = extract_html("".join(chunks))
-            if not html:
-                raise HtmlExtractionError()
+            result = extract_result("".join(chunks))
+            if not result:
+                raise OutputValidationError()
     except TimeoutError:
-        raise LLMTimeoutError(phase="generate")
+        raise ExternalServiceTimeoutError(phase="process")
 ```
 
 不需要 ANSI 过滤——API 响应是纯文本，无终端转义码。
 
 ## 超时保护
 
-每个 DAG 阶段用 `asyncio.timeout()` 包裹 LLM 调用：
+每个 DAG 阶段用 `asyncio.timeout()` 包裹 LLM 调用（示范）：
 
 | 阶段 | 配置项 |
 |------|--------|
-| phase1_dialog（单轮对话） | `dialog_timeout_seconds`（默认 60s） |
-| phase2_preview（3 张预览） | `preview_timeout_seconds`（默认 180s） |
-| phase3_generate（完整 HTML） | `generate_timeout_seconds`（默认 300s） |
+| intake（收集输入） | `intake_timeout_seconds`（默认 60s） |
+| process（LLM 处理） | `process_timeout_seconds`（默认 300s） |
 
-超时后抛 `LLMTimeoutError`（`domain/exceptions.py`），不静默挂起。
+超时后抛 `ExternalServiceTimeoutError`（`domain/exceptions.py`），不静默挂起。
 
 ## 连接管理
 

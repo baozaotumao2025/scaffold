@@ -27,7 +27,7 @@
 
 ## 其他约定
 
-- 每次生成请求使用独立 UUID 工作目录：`~/ppt-gen/{uuid}/`
+- 每次会话/请求使用独立 UUID 工作目录：`{WORK_DIR}/{uuid}/`（`WORK_DIR` 经 .env 注入）
 
 ## 包管理概览
 

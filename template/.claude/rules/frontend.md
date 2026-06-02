@@ -6,7 +6,7 @@ paths: ["frontend/**"]
 
 React + Vite + TypeScript + Tailwind 前端的技术栈、目录、各层职责边界、TS 规范与测试规范。
 
-聊天式交互界面，实时展示 Gemini 对话、风格预览、HTML 演示文稿和下载入口。
+> 下文以「订单」交互为示范，仅占位；组件/状态命名替换为你的业务，分层与边界规则不变。实时交互界面经 WebSocket 展示服务端推送的状态变化。
 
 ## 技术栈
 
@@ -51,30 +51,27 @@ const wsUrl = import.meta.env.VITE_BACKEND_WS_URL   // ws://localhost:8000
 frontend/
 ├── src/
 │   ├── components/              # 纯 UI 组件（无业务逻辑，无直接 store 读写）
-│   │   ├── ChatBubble.tsx       # 单条对话气泡（Gemini / 用户）
-│   │   ├── ChatInput.tsx        # 输入框 + 发送按钮
-│   │   ├── StylePicker.tsx      # 3 张风格预览卡片，点击选择
-│   │   ├── PreviewFrame.tsx     # iframe 展示完整 HTML 演示文稿
-│   │   ├── ProgressBar.tsx      # 截图/合成进度条
-│   │   ├── DownloadBar.tsx      # HTML + PPTX 下载按钮
+│   │   ├── OrderForm.tsx        # 录入/编辑表单（示范）
+│   │   ├── OrderList.tsx        # 列表展示
+│   │   ├── StatusBadge.tsx      # 状态标识
+│   │   ├── ProgressBar.tsx      # 处理进度条
 │   │   ├── ErrorBoundary.tsx    # React 错误边界（组件级异常）
 │   │   └── Toast.tsx            # 全局 Toast 容器（sonner Toaster）
 │   ├── pages/                   # 页面级组件（组合 components，接入 hooks）
-│   │   └── GeneratorPage.tsx
+│   │   └── OrderPage.tsx
 │   ├── hooks/                   # 自定义 Hook（业务逻辑与副作用）
 │   │   ├── useWebSocket.ts      # WebSocket 生命周期管理
-│   │   ├── usePresentation.ts   # 会话状态机（dispatch + 状态衍生）
-│   │   └── useImageSource.ts    # 图片源配置读写（localStorage）
+│   │   └── useOrder.ts          # 会话状态机（dispatch + 状态衍生）
 │   ├── services/                # 外部通信封装（纯函数，无 React 依赖）
 │   │   └── wsClient.ts          # WebSocket send/receive，消息序列化
 │   ├── store/                   # Zustand store
-│   │   └── presentationStore.ts # session、messages、previewUrls、status
+│   │   └── orderStore.ts        # session、messages、orders、status
 │   ├── types/                   # TypeScript 类型（只定义，不实现）
-│   │   └── messages.ts          # WsMessage、PreviewItem、SessionStatus 等
+│   │   └── messages.ts          # WsMessage、OrderDTO、SessionStatus 等
 │   ├── schemas/                 # Zod schema（运行时验证，与 types 一一对应）
-│   │   └── messages.ts          # wsMessageSchema、stylePickSchema 等
+│   │   └── messages.ts          # wsMessageSchema、createOrderSchema 等
 │   ├── utils/                   # 纯函数工具（无副作用）
-│   │   └── ansiStrip.ts         # 过滤 ANSI 转义码
+│   │   └── format.ts            # 纯函数格式化（金额/日期等）
 │   └── main.tsx                 # 入口：挂载 ErrorBoundary + Toaster
 └── tests/
     ├── components/

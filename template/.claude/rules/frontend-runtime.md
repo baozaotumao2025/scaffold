@@ -51,7 +51,7 @@ window.addEventListener('unhandledrejection', (event) => {
 | 错误类型 | 展示方式 |
 |---------|---------|
 | WebSocket 连接失败 | Toast（error）+ 重连提示 |
-| Gemini 超时/失败 | 聊天气泡（系统消息）+ Toast |
+| 外部服务超时/失败 | 系统消息气泡 + Toast |
 | 文件下载失败 | Toast（error） |
 | 组件渲染崩溃 | ErrorBoundary fallback UI |
 
@@ -92,18 +92,19 @@ dispatch(msg.data)
 
 ## 页面交互状态流
 
+下面是**示范**状态流（订单），按你的业务替换状态与展示：
+
 ```
-idle ──► dialog ──► previewing ──► generating ──► screenshotting ──► done
-                                                                       │
-                                                              refining ◄┘
+idle ──► editing ──► submitting ──► processing ──► done
+                                                     │
+                                            revising ◄┘
 ```
 
 | 状态 | 展示内容 |
 |------|---------|
-| `idle` | 初始引导（语言/图片源选择） |
-| `dialog` | 聊天气泡 + ChatInput |
-| `previewing` | StylePicker（3 个 iframe 预览卡片） |
-| `generating` | ProgressBar + 日志气泡 |
-| `screenshotting` | ProgressBar（逐页进度） |
-| `done` | PreviewFrame + DownloadBar + ChatInput（refine） |
-| `error` | 错误气泡 + 重试按钮 |
+| `idle` | 初始引导 |
+| `editing` | 表单录入（OrderForm） |
+| `submitting` | 提交中（ProgressBar） |
+| `processing` | 服务端处理中（ProgressBar + 日志） |
+| `done` | 结果展示 + 操作入口（可触发 revising） |
+| `error` | 错误提示 + 重试按钮 |

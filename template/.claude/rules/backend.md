@@ -106,14 +106,14 @@ backend 是支撑域，遵循六边形架构，依赖恒向内：
 
 | 项 | 规范 |
 |----|------|
-| 资源 | 名词复数：`/api/v1/sessions`、`/api/v1/sessions/{session_id}/pptx` |
+| 资源 | 名词复数：`/api/v1/sessions`、`/api/v1/sessions/{session_id}/export` |
 | 路径段 | 小写 + kebab-case，不放动词（动作用 HTTP method） |
 | 方法 | GET 读 / POST 建 / PUT 全量改 / PATCH 局部改 / DELETE 删 |
 | JSON 字段 | snake_case |
 | 版本 | `/api/v1` 前缀 |
 | 状态码 | 语义化 200/201/204/4xx/5xx |
 
-例：`GET /api/v1/sessions/{session_id}/pptx`。路径/字段命名靠 review + 可选 spectral（OpenAPI lint）；HTTP 语义靠 review。
+例：`GET /api/v1/sessions/{session_id}/export`。路径/字段命名靠 review + 可选 spectral（OpenAPI lint）；HTTP 语义靠 review。
 
 ### Swagger / OpenAPI 文档
 
@@ -157,8 +157,8 @@ backend 是支撑域，遵循六边形架构，依赖恒向内：
 class Settings(BaseSettings):
     env: Literal["dev", "prod"] = "dev"
     agent_ws_url: str = "ws://localhost:8001"
-    work_dir: Path = Path.home() / "ppt-gen"
-    database_url: str = f"sqlite+aiosqlite:///{Path.home()}/ppt-gen/ppt_gen.db"
+    work_dir: Path = Path.home() / "app-data"
+    database_url: str = f"sqlite+aiosqlite:///{Path.home()}/app-data/app.db"
     port: int = 8000
     log_level: str = "DEBUG"
     enable_api_docs: bool = True
@@ -190,7 +190,7 @@ async def ws_proxy(ws: WebSocket, session_id: str, repo: SessionRepository = Dep
 
 ## 日志规范（core/logging.py）
 
-loguru，两个 sink：stderr（dev 人类可读彩色）+ `~/ppt-gen/logs/backend.log`（JSON 每行一条，所有环境）。文件 sink 配 `rotation="100 MB"`、`retention="14 days"`、`compression="zip"`。级别 `DEBUG`(dev)/`INFO`(prod)。每条日志必须携带 `request_id`（loguru contextualize 注入）。禁止 `print()` 与 stdlib `logging`，统一 `from loguru import logger`。
+loguru，两个 sink：stderr（dev 人类可读彩色）+ `{WORK_DIR}/logs/backend.log`（JSON 每行一条，所有环境）。文件 sink 配 `rotation="100 MB"`、`retention="14 days"`、`compression="zip"`。级别 `DEBUG`(dev)/`INFO`(prod)。每条日志必须携带 `request_id`（loguru contextualize 注入）。禁止 `print()` 与 stdlib `logging`，统一 `from loguru import logger`。
 
 ## 测试规范
 

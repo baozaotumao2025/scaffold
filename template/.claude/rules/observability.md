@@ -11,9 +11,9 @@ paths: ["backend/**", "agent/**", "frontend/**"]
 
 | 层 | 文件 | 格式 |
 |----|------|------|
-| Backend | `~/ppt-gen/logs/backend.log` | JSON，每行一条，含 request_id |
-| Agent | `~/ppt-gen/logs/agent.log` | JSON，每行一条，含 session_id |
+| Backend | `{WORK_DIR}/logs/backend.log` | JSON，每行一条，含 request_id |
+| Agent | `{WORK_DIR}/logs/agent.log` | JSON，每行一条，含 session_id |
 | Frontend | console（dev）/ 可接 Sentry（prod） | 结构化对象 |
 
-- **探针**：每个服务暴露 `GET /health`（存活）与 `GET /ready`（依赖就绪，如 Agent 检查 skill 已装、Chromium 可启动）
+- **探针**：每个服务暴露 `GET /health`（存活）与 `GET /ready`（依赖就绪，如 Agent 检查外部依赖可用）
 - 禁止 `print()` / `console.log()`，统一用各层 logger（见 `conventions.md`）

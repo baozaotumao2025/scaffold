@@ -6,22 +6,23 @@ paths: ["backend/**", "agent/**", "frontend/**"]
 
 > 查阅型：各消息 type 的 payload 形状，外层由信封包裹（见 `communication-protocol.md`）。字段一律 snake_case。
 
+> 以下以「订单」为示范业务，仅占位；按项目实际定义自己的消息。
+
 命令（Browser → Backend → Agent）：
 
 ```json
-{"type": "start_session", "language": "中文", "image_source": "unsplash", "image_api_key": "xxx"}
-{"type": "user_input",    "text": "深圳科技政策解读"}
-{"type": "style_pick",    "index": 2}
+{"type": "start_session", "channel": "web"}
+{"type": "create_order",  "items": [{"sku": "A-1", "qty": 2}]}
+{"type": "submit_order",  "order_id": "..."}
 ```
 
 事件（Agent → Backend → Browser）：
 
 ```json
-{"type": "gemini_message", "text": "请问你的 PPT 主旨是什么？"}
-{"type": "style_preview",  "index": 1, "preview_url": "/api/v1/preview/{sid}/preview_1.html"}
-{"type": "log",            "message": "📸 截图第 3/10 页"}
-{"type": "html_ready",     "session_id": "..."}
-{"type": "pptx_ready",     "session_id": "..."}
+{"type": "order_created",   "order_id": "...", "status": "pending"}
+{"type": "item_priced",     "sku": "A-1", "amount": {"currency": "CNY", "value": 1990}}
+{"type": "log",             "message": "正在校验库存 2/3"}
+{"type": "order_confirmed", "order_id": "..."}
 {"type": "done"}
-{"type": "error",          "code": "GEMINI_TIMEOUT", "message": "..."}
+{"type": "error",           "code": "EXTERNAL_SERVICE_TIMEOUT", "message": "..."}
 ```

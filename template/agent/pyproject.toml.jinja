@@ -8,14 +8,12 @@ dependencies = [
     "uvicorn[standard]",
     "loguru",
     "pydantic-settings",
-{%- if llm_provider == 'gemini-cli' %}
-    "playwright",
-    "python-pptx",
-{%- elif llm_provider == 'openai-api' %}
+{%- if llm_provider == 'openai-api' %}
     "openai",
 {%- elif llm_provider == 'anthropic-api' %}
     "anthropic",
 {%- endif %}
+    # 业务相关外部能力（导出、第三方 SDK 等）按需自行 uv add
 ]
 
 [dependency-groups]
@@ -50,4 +48,4 @@ root_packages = ["src"]
 name = "Domain zero IO"
 type = "forbidden"
 source_modules = ["src.domain"]
-forbidden_modules = ["fastapi", "httpx", "subprocess", "playwright"]
+forbidden_modules = ["fastapi", "httpx", "subprocess"]

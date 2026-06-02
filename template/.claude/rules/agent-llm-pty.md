@@ -5,7 +5,7 @@ paths:
 
 # Agent LLM 驱动层与 PTY 桥接
 
-厂商无关的 LLM CLI 抽象、PTY 伪终端桥接机制、超时保护与 HTML 拦截检测。
+厂商无关的 LLM CLI 抽象、PTY 伪终端桥接机制、超时保护与输出拦截检测。
 
 ## LLM CLI 驱动层（llm/）
 
@@ -15,7 +15,7 @@ paths:
 |------|------|
 | `domain/ports.py` | `LLMSession` 协议（端口，接口定义） |
 | `pty_bridge.py` | 共享 PTY 机制（所有 CLI 厂商复用） |
-| `gemini_cli.py` | `GeminiCliSession`：gemini 命令 + prompt 约定 + HTML 提取 |
+| `gemini_cli.py` | `GeminiCliSession`：gemini 命令 + prompt 约定 + 输出提取 |
 
 **扩展新厂商**：新增 `claude_cli.py` 等实现 `LLMSession` 端口即可，PTY 机制无需重写。
 
@@ -74,25 +74,24 @@ os.write(master_fd, (user_text + '\n').encode('utf-8'))
 
 ### 超时保护
 
-每个 DAG 阶段设置独立超时（`asyncio.wait_for`）：
+每个 DAG 阶段设置独立超时（`asyncio.wait_for`），阶段为示范：
 
 | 阶段 | 超时 |
 |------|------|
-| phase1_dialog（单轮回答） | 60s |
-| phase2_preview（3 张预览） | 180s |
-| phase3_generate（完整 HTML） | 300s |
-| screenshot | 180s |
+| intake（收集输入） | 60s |
+| process（LLM 处理输出） | 300s |
 
-超时后抛 `GeminiTimeoutError`。
+超时后抛 `ExternalServiceTimeoutError`。
 
-## HTML 拦截检测
+## 输出拦截检测
+
+CLI 输出是流式文本，需按约定标记从中提取结构化结果。下面以提取代码块为例（按你的输出约定替换正则）：
 
 ```python
-def detect_html(text: str) -> str | None:
-    m = re.search(r'```html\s*([\s\S]+?)```|(<html[\s\S]+?</html>)', text, re.IGNORECASE)
-    return (m.group(1) or m.group(2)).strip() if m else None
+def detect_output(text: str) -> str | None:
+    m = re.search(r'```result\s*([\s\S]+?)```', text, re.IGNORECASE)
+    return m.group(1).strip() if m else None
 ```
 
 根据 `state.status` 决定处理：
-- `"previewing"` → 保存 `preview_{n}.html`，推送 `style_preview` 事件
-- `"generating"` → 保存 `slides.html`，推送 `html_ready`，触发后续节点
+- `"processing"` → 提取到结果即保存产物，推送 `result_ready`，触发后续节点

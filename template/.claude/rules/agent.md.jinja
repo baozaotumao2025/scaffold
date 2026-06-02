@@ -7,9 +7,11 @@ paths:
 
 Agent 服务的职责、技术栈、目录结构、配置{% if llm_provider == 'gemini-cli' %}、Skill 安装{% endif %}与测试规范。
 
+> 以下以一条「会话→LLM 处理→结果」的通用流水线作示范；按你的业务替换节点与扩展点，架构不变。
+
 ## 概览（职责）
 
-FastAPI 服务（port {{ agent_port }}）。核心职责：{% if llm_provider == 'gemini-cli' %}PTY 桥接 LLM CLI 交互式会话{% else %}通过 SDK 调用 LLM API{% endif %} + DAG 编排（对话 → 风格预览 → 生成 → 截图 → 合成）+ 事件流式推送给 Backend。
+FastAPI 服务（port {{ agent_port }}）。核心职责：{% if llm_provider == 'gemini-cli' %}PTY 桥接 LLM CLI 交互式会话{% else %}通过 SDK 调用 LLM API{% endif %} + DAG 编排（intake → process → validate → finalize）+ 事件流式推送给 Backend。
 
 ## 技术栈
 
@@ -28,27 +30,24 @@ FastAPI 服务（port {{ agent_port }}）。核心职责：{% if llm_provider ==
 {% else -%}
 | asyncio | 异步 I/O，协调 LLM 调用与 WebSocket |
 {% endif -%}
-| playwright（async） | 截取每页幻灯片截图 |
-| python-pptx | 合成 PPTX |
 | loguru | 结构化日志 |
 | pytest + pytest-asyncio | 测试 |
+
+> 业务相关的外部能力（导出、第三方 API 等）按需经扩展点接入，对应依赖用 `uv add` 自行添加。
 
 ## 包管理（uv）
 
 ```bash
 # 添加依赖
 {% if llm_provider == 'gemini-cli' -%}
-uv add fastapi uvicorn playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+uv add fastapi uvicorn loguru pydantic-settings pytest pytest-asyncio
 {% elif llm_provider == 'openai-api' -%}
-uv add fastapi uvicorn openai playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+uv add fastapi uvicorn openai loguru pydantic-settings pytest pytest-asyncio
 {% elif llm_provider == 'anthropic-api' -%}
-uv add fastapi uvicorn anthropic playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+uv add fastapi uvicorn anthropic loguru pydantic-settings pytest pytest-asyncio
 {% else -%}
-uv add fastapi uvicorn playwright python-pptx loguru pydantic-settings pytest pytest-asyncio
+uv add fastapi uvicorn loguru pydantic-settings pytest pytest-asyncio
 {% endif %}
-# 安装 Playwright 浏览器（首次）
-uv run playwright install chromium
-
 # 运行服务
 uv run python -m src.main
 
@@ -93,15 +92,15 @@ agent/
 │   │   └── custom_llm.py        # 自定义 LLMSession 实现
 {% endif -%}
 │   │   └── registry.py
-│   ├── providers/               # 扩展点②：ImageProvider 适配器
+│   ├── providers/               # 扩展点②：外部能力 Provider 适配器（示范）
 │   │   └── registry.py
-│   ├── export/                  # 扩展点③：Exporter 适配器
-│   │   └── pptx_exporter.py
+│   ├── export/                  # 扩展点③：Exporter 适配器（如需导出）
+│   │   └── registry.py
 │   ├── storage/                 # 扩展点④：StorageBackend 适配器
 │   │   └── local_storage.py
 {% if llm_provider == 'gemini-cli' -%}
 │   ├── skills/
-│   │   └── installer.py         # CLI skill 自动安装
+│   │   └── installer.py         # CLI skill 自动安装（可选）
 {% endif -%}
 │   ├── utils/
 {% if llm_provider == 'gemini-cli' -%}
@@ -137,7 +136,7 @@ class Settings(BaseSettings):
     log_level: str = "DEBUG"
 {% if llm_provider == 'gemini-cli' %}
     llm_cmd: str = "gemini"
-    skill_name: str = "frontend-slides"
+    skill_name: str = ""           # 可选：要加载的 CLI skill 名
     skill_repo: str = ""           # 从 .env 注入
     pty_read_buffer_size: int = 4096
 {% elif llm_provider == 'openai-api' %}
@@ -153,33 +152,32 @@ class Settings(BaseSettings):
     llm_model: str = ""
     llm_base_url: str = ""
 {% endif %}
-    generate_timeout_seconds: int = 300
-    preview_timeout_seconds: int = 180
-    dialog_timeout_seconds: int = 60
+    process_timeout_seconds: int = 300
+    intake_timeout_seconds: int = 60
     max_concurrent_sessions: int = 4
     process_pool_workers: int = os.cpu_count() or 4
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 ```
 {% if llm_provider == 'gemini-cli' %}
-## Skill 安装（skills/installer.py）
+## Skill 安装（skills/installer.py，可选）
 
-Agent 启动时自动确保配置指定的 skill 已安装。`skill_name` 与 `skill_repo` 均来自 `Settings`，换 skill 只改 `.env`，不改代码。
+若 LLM CLI 需要预装某个 skill，Agent 启动时自动确保配置指定的 skill 已安装。`skill_name` 与 `skill_repo` 均来自 `Settings`，换 skill 只改 `.env`，不改代码。
 
 > 注意：安装目的地路径（`~/.gemini/skills/`）是 Gemini CLI 约定；换 CLI 时 `installer.py` 需同步修改。
 {% endif %}
 ## 测试规范
 
 {% if llm_provider == 'gemini-cli' -%}
-- PTY 测试：mock `pty.openpty`、`os.read/write`，验证 ANSI 过滤和 HTML 检测
-- 超时测试：注入假 PTY 不输出，验证 `LLMTimeoutError` 被抛出
+- PTY 测试：mock `pty.openpty`、`os.read/write`，验证 ANSI 过滤和输出检测
+- 超时测试：注入假 PTY 不输出，验证 `ExternalServiceTimeoutError` 被抛出
 - skill 安装测试：mock `git clone`，验证成功/失败分支
 {% else -%}
 - LLM session 测试：mock `LLMSession.generate` 返回 `AsyncIterator[str]`，验证流式处理
-- 超时测试：`generate` mock 为永不完成的迭代器，验证 `LLMTimeoutError` 被抛出
+- 超时测试：`generate` mock 为永不完成的迭代器，验证 `ExternalServiceTimeoutError` 被抛出
 {% endif -%}
 - DAG 节点测试：mock `send` 回调，验证状态转换和推送消息类型
 - checkpoint 恢复测试：
   - 注入 `checkpoint={status: "done"}` → 验证直接推送结果，不启动 LLM
-  - 注入 `checkpoint={status: "screenshotting"}` → 验证跳过 LLM 直接进截图节点
-  - 注入 `checkpoint={status: "dialog"}` → 验证推送 `checkpoint_lost`
+  - 注入 `checkpoint={status: "finalizing"}` → 验证跳过 LLM 直接进 finalize 节点
+  - 注入 `checkpoint={status: "intake"}` → 验证推送 `checkpoint_lost`

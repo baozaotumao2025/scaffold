@@ -23,9 +23,9 @@
 |------|------|------|------|
 | 单元 | 纯函数、节点、service、hook（mock 边界） | ~70% | pytest / vitest |
 | 集成 | 路由+DB、WS 代理转发、DAG 串联 | ~25% | httpx / Testing Library |
-| E2E | 一条龙：输入→生成→下载（mock LLM CLI 输出） | ~5% | Playwright |
+| E2E | 一条龙：输入→处理→结果（mock 外部依赖输出） | ~5% | Playwright |
 
 - **覆盖率门禁**：行覆盖 ≥ 80%（核心 hooks/schemas/dag 节点 100%），CI `--cov-fail-under=80` / vitest `coverage.thresholds`
-- **mock 边界清晰**：只 mock 外部依赖（LLM CLI 子进程、Chromium、网络），不 mock 被测对象内部
+- **mock 边界清晰**：只 mock 外部依赖（LLM CLI 子进程、第三方 API、网络），不 mock 被测对象内部
 - **测试命名**：`test_<被测>_<场景>_<期望>`；一个测试只断言一件事
 - **确定性**：禁止依赖真实时间/网络/随机；用 fixture 注入
