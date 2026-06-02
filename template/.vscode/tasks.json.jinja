@@ -1,0 +1,47 @@
+// 由 scaffold 生成（vscode_auto_watch=true）。
+// 打开项目即在后台启动 watch 任务，编码时持续检查、即时发现问题。
+//
+// ⚠ 首次使用需授权自动运行：命令面板 → "Tasks: Allow Automatic Tasks"。
+// 关闭单个任务：把其 runOptions.runOn 改为 "default"；全部关闭：删除本文件。
+// 查看输出：终端面板的下拉里选对应 watch 任务。
+{
+  "version": "2.0.0",
+  "tasks": [
+{%- if include_frontend %}
+    {
+      "label": "watch: frontend typecheck",
+      "type": "shell",
+      "command": "pnpm typecheck:watch",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "isBackground": true,
+      "problemMatcher": "$tsc-watch",
+      "presentation": { "group": "watch", "reveal": "never", "panel": "dedicated" },
+      "runOptions": { "runOn": "folderOpen" }
+    },
+{%- endif %}
+{%- if include_backend %}
+    {
+      "label": "watch: backend lint",
+      "type": "shell",
+      "command": "uv run ruff check --watch src",
+      "options": { "cwd": "${workspaceFolder}/backend" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "watch", "reveal": "never", "panel": "dedicated" },
+      "runOptions": { "runOn": "folderOpen" }
+    },
+{%- endif %}
+{%- if include_agent %}
+    {
+      "label": "watch: agent lint",
+      "type": "shell",
+      "command": "uv run ruff check --watch src",
+      "options": { "cwd": "${workspaceFolder}/agent" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "group": "watch", "reveal": "never", "panel": "dedicated" },
+      "runOptions": { "runOn": "folderOpen" }
+    },
+{%- endif %}
+  ]
+}

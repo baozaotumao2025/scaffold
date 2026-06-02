@@ -140,6 +140,7 @@ copier copy git+https://github.com/baozaotumao2025/scaffold.git my-new-project
 | `database` | choice | sqlite | `sqlite` / `postgresql` |
 | `node_version` | choice | 22 | 20 / 22 |
 | `llm_provider` | choice | gemini-cli | `gemini-cli` / `openai-api` / `anthropic-api` / `custom` |
+| `vscode_auto_watch` | bool | false | VSCode 打开项目自动启动 watch 任务（编码即时查错） |
 
 > `llm_provider` 仅在 `include_agent=true` 时出现。
 

@@ -35,6 +35,8 @@ _exclude:
   - "{% if not (include_backend and include_agent) %}.claude/rules/data-lifecycle.md{% endif %}"
   # communication-catalog: 描述服务间 WS 消息，单服务时无跨层通信
   - "{% if not (include_backend or include_agent) or not (include_agent or include_frontend) %}.claude/rules/communication-catalog.md{% endif %}"
+  # ── VSCode 自动 watch（仅 vscode_auto_watch=true 时生成）──────────────────
+  - "{% if not vscode_auto_watch %}.vscode/tasks.json{% endif %}"
 
 _tasks:
   - command: git init
@@ -161,3 +163,10 @@ llm_cmd:
   help: LLM CLI 命令（留空则按 provider 默认）
   default: "{% if llm_provider == 'gemini-cli' %}gemini{% elif llm_provider == 'openai-api' %}openai{% else %}llm{% endif %}"
   when: "{{ include_agent }}"
+
+# ── 编辑器（VSCode）─────────────────────────────────────────────────────────
+vscode_auto_watch:
+  type: bool
+  help: VSCode 打开项目时自动启动 watch 任务（类型/lint 持续后台检查，编码时即时发现问题）？
+  default: false
+  when: "{{ include_backend or include_agent or include_frontend }}"
