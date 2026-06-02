@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# 校验 README.md 是否记录了 template/ 的架构基座目录，防止文档随模板改动漂移。
-# 仅作用于 scaffold 仓库自身（不进生成项目、不属 skill）。
-# 用法：./scripts/check-docs.sh    退出码 0=同步 / 1=有未记录目录
+# scaffold 仓库自身的一致性检查（不进生成项目、不属 skill）：
+#   1) README 是否记录了 template/ 的架构基座目录（防文档漂移）
+#   2) skill 自包含的 verify.sh 是否与根 scripts/verify.sh 同步（防两份漂移）
+# 用法：./scripts/check-docs.sh    退出码 0=一致 / 1=有问题
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -34,10 +35,24 @@ for entry in ".vscode" ".claude/commands" ".copier-answers.yml" "pnpm-workspace.
   fi
 done
 
+# ── skill 自包含校验：两份 verify.sh 必须一致 ──────────────────────────────
+ROOT_VERIFY="$ROOT/scripts/verify.sh"
+SKILL_VERIFY="$ROOT/.claude/skills/new-project/scripts/verify.sh"
+if [ -f "$ROOT_VERIFY" ] && [ -f "$SKILL_VERIFY" ]; then
+  if ! cmp -s "$ROOT_VERIFY" "$SKILL_VERIFY"; then
+    echo "✗ scripts/verify.sh 与 skill 内副本不一致"
+    echo "  改了 scripts/verify.sh 后需同步：cp scripts/verify.sh .claude/skills/new-project/scripts/verify.sh"
+    fail=1
+  fi
+else
+  echo "✗ verify.sh 缺失（根或 skill 内）"
+  fail=1
+fi
+
 if [ "$fail" -eq 0 ]; then
-  echo "✓ README 已覆盖 template 的架构基座目录与关键产物"
+  echo "✓ README 覆盖 template 架构基座目录；skill verify.sh 与根一致"
 else
   echo ""
-  echo "→ 请更新 README.md 的「架构基座」章节与「脚手架内容」文件树后重试。"
+  echo "→ 修复上述问题后重试（文档更新 / 同步 verify.sh）。"
   exit 1
 fi

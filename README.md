@@ -26,7 +26,7 @@ curl -fsSL https://raw.githubusercontent.com/baozaotumao2025/scaffold/main/scrip
 
 可用 preset：`principles`（仅规则）· `fullstack` · `fullstack-ai` · `api-only`。
 
-> 模板由 copier 从 GitHub 实时拉取。`verify.sh` 在仓库根 `scripts/` 单一维护，安装时由 `install-skill.sh` 组装进 skill，使安装后的 skill 自包含。
+> 模板由 copier 从 GitHub 实时拉取。skill 目录 `.claude/skills/new-project/` **自包含**（SKILL.md + scripts/verify.sh），安装即整目录拷贝，符合 skill 可移植惯例。
 
 ---
 
@@ -139,12 +139,13 @@ backend/src/                         agent/src/                      frontend/sr
 scaffold/
 ├── copier.yml                           ← 问卷变量 + 条件排除逻辑
 ├── README.md
-├── .claude/skills/new-project/
-│   └── SKILL.md                         ← skill 元数据 + 生成指令（verify.sh 安装时组装）
-├── .github/workflows/docs-check.yml     ← scaffold 自身 CI：防 README 与 template 漂移
+├── .claude/skills/new-project/          ← 自包含 skill（拷了即用，符合惯例）
+│   ├── SKILL.md                         ← skill 元数据 + 生成指令
+│   └── scripts/verify.sh                ← skill 自带（与根 scripts/verify.sh 同步，CI 防漂移）
+├── .github/workflows/docs-check.yml     ← scaffold 自身 CI：防文档/verify.sh 漂移
 ├── scripts/
-│   ├── verify.sh                        ← 工具链合规检查（幂等只读，单一源）
-│   ├── install-skill.sh                 ← 把 skill 安装到 ~/.claude/skills/
+│   ├── verify.sh                        ← 工具链合规检查（幂等只读，维护/retrofit 用）
+│   ├── install-skill.sh                 ← 整目录拷贝安装 skill 到 ~/.claude/skills/
 │   ├── check-docs.sh                    ← 校验 README 覆盖 template 架构基座目录
 │   └── retrofit.sh                      ← 补装工具链到已有项目
 └── template/
