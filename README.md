@@ -65,6 +65,25 @@ include_frontend=false         →  所有 frontend*.md 排除
 
 ---
 
+## 四层质量护栏（左移，编码即查错）
+
+同一套规则（ruff/mypy 读 `pyproject.toml`，eslint/prettier 读各自配置）贯穿四层，越靠前越早发现，到 commit 时基本只是确认：
+
+| 层 | 时机 | 机制 | 是否默认生成 |
+|----|------|------|------|
+| **1 编辑器 LSP** | 边打字 | `.vscode/settings.json` + `extensions.json`：保存自动格式化/修复、实时标红 | ✅ 始终 |
+| **2 watch 监听** | 一保存 | `.vscode/tasks.json`：打开项目自动起 `tsc --watch` / `ruff --watch` | 开关 `vscode_auto_watch` |
+| **3 pre-commit** | git commit | `.pre-commit-config.yaml`：ruff/mypy/eslint/tsc/gitleaks | ✅ 始终 |
+| **4 CI** | push / PR | `.github/workflows/ci.yml` | ✅ 始终 |
+
+关于 `.vscode/`：
+
+- **只影响当前项目**（工作区级），不碰你的 VSCode 全局配置；个人偏好（主题/字号）仍走全局。
+- 是**团队级规则**，随 scaffold 演进——`copier update` 走 3-way 合并推送改进，仅改了同一行才提示冲突。
+- 首次用 watch 需在命令面板执行一次 **"Tasks: Allow Automatic Tasks"** 授权。
+
+---
+
 ## 脚手架内容
 
 ```
@@ -78,8 +97,13 @@ scaffold/
 │   ├── install-skill.sh                 ← 把 skill 安装到 ~/.claude/skills/
 │   └── retrofit.sh                      ← 补装工具链到已有项目
 └── template/
-    ├── .pre-commit-config.yaml.jinja    ← 按服务条件生成 hooks
+    ├── .copier-answers.yml.jinja        ← 记录模板版本+答案，供 copier update
+    ├── .pre-commit-config.yaml.jinja    ← 按服务条件生成 hooks（含 gitleaks）
     ├── .github/workflows/ci.yml.jinja   ← 按服务条件生成 CI jobs
+    ├── .vscode/                         ← 编辑器实时护栏（始终生成）
+    │   ├── settings.json.jinja          ← 保存自动格式化/修复（按服务裁剪）
+    │   ├── extensions.json.jinja        ← 推荐扩展（ruff/eslint/mypy…）
+    │   └── tasks.json.jinja             ← 自动 watch（仅 vscode_auto_watch=true）
     ├── docker-compose.yml.jinja
     ├── CLAUDE.md.jinja                  ← 项目说明参数化
     ├── .claude/rules/
@@ -101,7 +125,7 @@ scaffold/
     │       └── backend-db.md.jinja      ← SQLite 配置 vs PostgreSQL 配置
     ├── backend/  pyproject.toml / Dockerfile / .env.example / src/
     ├── agent/    同上
-    └── frontend/ package.json / tsconfig / eslint / prettier / vitest / vite
+    └── frontend/ package.json / pnpm-workspace.yaml / tsconfig / eslint / prettier / vitest / vite
 ```
 
 ---
