@@ -1,0 +1,33 @@
+// 由 scaffold 生成：编辑器实时护栏（第 1 层）。
+// 规则单一来源——ruff/mypy 读 pyproject.toml，eslint/prettier 读各自配置；
+// 本文件只把编辑器指向同一套配置，不另设规则，避免与 pre-commit 漂移。
+{
+  "editor.formatOnSave": true,
+{%- if include_backend or include_agent %}
+
+  // Python：ruff 做 lint+format（保存自动修复 + 整理 import）
+  "[python]": {
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.ruff": "explicit",
+      "source.organizeImports.ruff": "explicit"
+    }
+  },
+  // Pylance 走 basic（边打字即时反馈、噪声低）；
+  // 权威 strict 类型检查交给 mypy 扩展，按 pyproject 的 [tool.mypy] 跑，与 pre-commit 一致
+  "python.analysis.typeCheckingMode": "basic",
+  "mypy-type-checker.importStrategy": "fromEnvironment",
+{%- endif %}
+{%- if include_frontend %}
+
+  // 前端：prettier 格式化 + eslint 实时（边打字边查）
+  "[typescript]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "[typescriptreact]": { "editor.defaultFormatter": "esbenp.prettier-vscode" },
+  "eslint.run": "onType",
+  "eslint.workingDirectories": [{ "directory": "frontend", "changeProcessCWD": true }],
+{%- endif %}
+
+  "files.eol": "\n",
+  "files.insertFinalNewline": true,
+  "files.trimTrailingWhitespace": true
+}

@@ -1,0 +1,17 @@
+// 由 scaffold 生成：打开项目时 VSCode 会提示安装这些扩展，
+// 它们提供与 pre-commit 一致的编辑器实时检查（第 1 层护栏）。
+{
+  "recommendations": [
+{%- if include_backend or include_agent %}
+    "charliermarsh.ruff",
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-python.mypy-type-checker",
+{%- endif %}
+{%- if include_frontend %}
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+{%- endif %}
+    "redhat.vscode-yaml"
+  ]
+}
