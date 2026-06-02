@@ -1,11 +1,11 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from loguru import logger
 
 from .core.config import get_settings
 from .core.logging import configure_logging
 
 settings = get_settings()
-configure_logging(settings.log_level)
+configure_logging(settings.log_level, settings.work_dir)
 
 app = FastAPI(
     title="{{ project_name }} Agent",
@@ -17,16 +17,41 @@ app = FastAPI(
 
 @app.get("/health")
 async def health() -> dict[str, str]:
+    """存活探针。"""
     return {"status": "ok"}
 
 
 @app.get("/ready")
 async def ready() -> dict[str, str]:
+    """就绪探针：可在此扩展外部依赖检查。"""
     return {"status": "ok"}
+
+
+@app.websocket("/ws/{session_id}")
+async def ws_endpoint(ws: WebSocket, session_id: str) -> None:
+    """会话接入点（骨架）。
+
+    功能开发时在此驱动 DAG runner：建会话 → 节点编排 → 流式推事件
+    （见 .claude/rules/agent-dag.md）。
+    """
+    await ws.accept()
+    logger.info("ws connected | session_id={}", session_id)
+    try:
+        while True:
+            msg = await ws.receive_json()
+            # TODO: 交给 dag.runner 处理，流式回推事件
+            await ws.send_json({"type": "ack", "received": msg.get("type")})
+    except WebSocketDisconnect:
+        logger.info("ws disconnected | session_id={}", session_id)
 
 
 if __name__ == "__main__":
     import uvicorn
 
     logger.info("Starting agent | port={}", settings.port)
-    uvicorn.run("src.main:app", host="0.0.0.0", port=settings.port, reload=True)
+    uvicorn.run(
+        "src.main:app",
+        host="0.0.0.0",  # noqa: S104  容器内绑定 0.0.0.0 属预期
+        port=settings.port,
+        reload=True,
+    )
