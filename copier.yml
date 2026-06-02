@@ -1,5 +1,8 @@
 _templates_suffix: .jinja
 
+# 模板文件都在 template/ 子目录；脚手架自身的 README/scripts/.claude/skills 不进生成项目
+_subdirectory: template
+
 _skip_if_exists:
   - "backend/src/**"
   - "agent/src/**"
@@ -14,12 +17,12 @@ _exclude:
   - "{% if not include_frontend %}frontend{% endif %}"
   # ── Backend 规则（仅 include_backend=true 时复制）──────────────────────
   - "{% if not include_backend %}.claude/rules/backend.md{% endif %}"
-  - "{% if not include_backend %}.claude/rules/backend-db.md.jinja{% endif %}"
+  - "{% if not include_backend %}.claude/rules/backend-db.md{% endif %}"
   - "{% if not include_backend %}.claude/rules/backend-concurrency.md{% endif %}"
   # ── Agent 规则（仅 include_agent=true 时复制）────────────────────────────
-  - "{% if not include_agent %}.claude/rules/agent.md.jinja{% endif %}"
+  - "{% if not include_agent %}.claude/rules/agent.md{% endif %}"
   - "{% if not include_agent %}.claude/rules/agent-dag.md{% endif %}"
-  - "{% if not include_agent %}.claude/rules/agent-concurrency.md.jinja{% endif %}"
+  - "{% if not include_agent %}.claude/rules/agent-concurrency.md{% endif %}"
   - "{% if not include_agent %}.claude/rules/agent-extension-points.md{% endif %}"
   # LLM 驱动层：按 llm_provider 只保留对应变体
   - "{% if not include_agent or llm_provider != 'gemini-cli' %}.claude/rules/agent-llm-pty.md{% endif %}"
