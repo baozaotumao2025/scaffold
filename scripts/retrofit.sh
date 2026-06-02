@@ -14,7 +14,7 @@
 set -euo pipefail
 
 # ── 默认值 ────────────────────────────────────────────────────────────────────
-SCAFFOLD_URL="${SCAFFOLD_URL:-git+https://github.com/your-org/scaffold.git}"
+SCAFFOLD_URL="${SCAFFOLD_URL:-git+https://github.com/baozaotumao2025/scaffold.git}"
 TARGET="."
 DRY_RUN=0
 FORCE=0

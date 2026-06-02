@@ -111,6 +111,22 @@ domain/(实体+值对象+端口 Protocol) → application/services → infrastru
 
 ---
 
+## Claude 署名策略（每个生成项目自带）
+
+控制提交信息里是否包含 `Co-Authored-By: Claude` 署名。**默认 off（不含）**，由 commit-msg 门禁每次提交强制执行。
+
+```bash
+./scripts/claude-attribution.sh status   # 查看当前策略
+./scripts/claude-attribution.sh off      # 不含署名（默认）
+./scripts/claude-attribution.sh on       # 保留署名
+```
+
+- 策略存于 `git config scaffold.includeClaude`（项目级），`_tasks` 生成时默认设为 `false`
+- **门禁**：`check-claude-attribution.sh` 挂在 pre-commit 的 commit-msg 阶段——策略 off 时自动剥除任何 Claude 署名行并提示，on 时保留
+- 即使有人/AI 在提交里带了署名，off 策略下也会被自动清掉，保证不入库
+
+---
+
 ## 架构基座（每个生成项目自带，开箱即跑）
 
 不加任何功能，生成的项目第一天就有**完整分层结构 + 与业务无关的横切基础设施**，三服务各自通过 ruff/mypy/build 门禁：
@@ -158,6 +174,9 @@ scaffold/
     │   └── tasks.json.jinja             ← 自动 watch（仅 vscode_auto_watch=true）
     ├── docker-compose.yml.jinja
     ├── CLAUDE.md.jinja                  ← 项目说明参数化
+    ├── scripts/
+    │   ├── claude-attribution.sh        ← 开关：本项目提交是否含 Claude 署名（默认 off）
+    │   └── check-claude-attribution.sh  ← commit-msg 门禁：按开关移除/保留署名
     ├── .claude/commands/
     │   └── new-feature.md.jinja         ← 项目内命令：按规则引导生成功能分层代码
     ├── .claude/rules/

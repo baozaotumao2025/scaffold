@@ -24,6 +24,15 @@ repos:
       - id: conventional-pre-commit
         stages: [commit-msg]
 
+  # Claude 署名门禁：按 scaffold.includeClaude 策略移除/保留（默认移除）
+  - repo: local
+    hooks:
+      - id: claude-attribution-gate
+        name: Claude 署名门禁
+        entry: bash scripts/check-claude-attribution.sh
+        language: system
+        stages: [commit-msg]
+
 {%- if include_backend or include_agent %}
 
   # Python（ruff 同时做 lint + format）

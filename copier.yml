@@ -43,6 +43,8 @@ _exclude:
 
 _tasks:
   - command: git init
+  # 默认不在提交中包含 Claude 署名（commit-msg 门禁据此剥除）；改用 ./scripts/claude-attribution.sh on 保留
+  - command: "git config scaffold.includeClaude false"
   - command: git add .
   - command: "git commit -m 'chore: initialize project from scaffold'"
   - command: uv sync
