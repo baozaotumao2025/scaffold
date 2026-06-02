@@ -1,8 +1,11 @@
 export default function App() {
   return (
-    <main>
-      <h1>{{ project_name }}</h1>
-      <p>脚手架已就绪。按 <code>.claude/rules</code> 在 <code>src/</code> 下分层实现业务。</p>
+    <main className="mx-auto max-w-2xl p-8">
+      <h1 className="text-2xl font-bold">{{ project_name }}</h1>
+      <p className="mt-2 text-gray-600">
+        脚手架已就绪。按 <code className="rounded bg-gray-100 px-1">.claude/rules</code>
+        {" "}在 <code className="rounded bg-gray-100 px-1">src/</code> 下分层实现业务。
+      </p>
     </main>
   );
 }
