@@ -9,9 +9,10 @@ msg_file="${1:?用法: check-claude-attribution.sh <commit-msg-file>}"
 include="$(git config --get scaffold.includeClaude 2>/dev/null || echo false)"
 [ "$include" = "true" ] && exit 0
 
-if grep -qiE 'co-authored-by:.*claude' "$msg_file"; then
+# 仅匹配行首的真尾注，避免误删正文里提到该短语的行
+if grep -qiE '^[[:space:]]*co-authored-by:.*claude' "$msg_file"; then
   tmp="$(mktemp)"
-  grep -viE 'co-authored-by:.*claude' "$msg_file" >"$tmp"
+  grep -viE '^[[:space:]]*co-authored-by:.*claude' "$msg_file" >"$tmp"
   mv "$tmp" "$msg_file"
   echo "🛡  已移除 Claude 署名（scaffold.includeClaude=false；保留请运行 ./scripts/claude-attribution.sh on）"
 fi
