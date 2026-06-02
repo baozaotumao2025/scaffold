@@ -84,6 +84,33 @@ include_frontend=false         →  所有 frontend*.md 排除
 
 ---
 
+## 按规则生成功能：`/new-feature`
+
+生成的项目自带一个 Claude Code 命令 `/new-feature`，把"按规则搭功能骨架"固化成一条标准提示词。
+
+```
+/new-feature 订单
+/new-feature 用户认证
+```
+
+**模式：纯结构 + 契约（不猜业务逻辑）。** Claude 现场阅读本项目的 `.claude/rules`，按六边形分层为该功能生成跨层的**文件骨架**：
+
+```
+domain/(实体+值对象+端口 Protocol) → application/services → infrastructure/db(repository)
+  → routers → 依赖注入；前端 types/schemas → store → hooks → components
+```
+
+- 每个方法写**完整签名 + docstring（前置/后置条件）**，方法体留 `raise NotImplementedError`
+- 接好依赖注入、注册路由、登记错误码
+- **不臆造业务逻辑、不写假设断言的测试**——避免你去调试 AI 猜的代码
+- 自检只跑 `ruff + mypy`（验证结构能编译、类型自洽），不跑 pytest
+
+命令按选型自动裁剪，只生成存在服务对应的层，末尾给出**待填充 TODO 清单**。
+
+> 分工：脚手架预生成 `core/` 等可运行 plumbing；`/new-feature` 引导 Claude 搭**结构正确、契约清晰、零需调试**的骨架；业务逻辑你按 `testing-tdd.md`（先测试后实现）自己填。
+
+---
+
 ## 脚手架内容
 
 ```
@@ -106,6 +133,8 @@ scaffold/
     │   └── tasks.json.jinja             ← 自动 watch（仅 vscode_auto_watch=true）
     ├── docker-compose.yml.jinja
     ├── CLAUDE.md.jinja                  ← 项目说明参数化
+    ├── .claude/commands/
+    │   └── new-feature.md.jinja         ← 项目内命令：按规则引导生成功能分层代码
     ├── .claude/rules/
     │   ├── # 原理层（10 个，静态，始终复制）
     │   ├── architecture.md / ddd.md / design-discipline.md ...

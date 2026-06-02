@@ -1,0 +1,69 @@
+按本项目的 `.claude/rules` 规则，为一个功能生成跨层的**结构与契约骨架**（垂直切片）。
+
+功能：$ARGUMENTS
+
+这是 **AI 引导**的脚手架命令：你（Claude）现场阅读规则并生成符合分层约束的代码结构，而非套用固定模板。
+
+**模式：纯结构 + 契约。** 只生成低风险、规则定死的部分（目录、文件、端口、方法签名、依赖注入、错误码登记）；**不要猜测业务逻辑**——方法体一律留 `raise NotImplementedError` / `# TODO`，由开发者后续填充。不要写带假设断言的测试。
+
+## 步骤
+
+### 1. 明确领域术语
+- 若功能名含糊，先用一句话和用户确认它的**统一语言**术语（聚合根、关键值对象、状态）。
+- 参照 `ddd.md` 的建模规约：按意图建模，不按 CRUD。
+
+### 2. 加载相关规则
+开工前先读，确保结构不偏离：
+- `ddd.md`、`design-discipline.md`、`architecture.md`（分层与依赖方向）
+- `error-codes.md`（新错误码先登记）
+{%- if include_backend or include_agent %}
+- `communication-protocol.md` / `communication-catalog.md`（若涉及跨服务消息）
+{%- endif %}
+
+### 3. 按层生成（依赖恒向内）
+只生成本功能需要的层，每层一个文件骨架。**每个方法/函数：写完整签名 + docstring（注明前置/后置条件/不变量），方法体留 `raise NotImplementedError`。**
+{% if include_backend %}
+**backend/**（见 `backend.md`、`backend-db.md`）：
+1. `domain/` — 实体/聚合根类（字段 + 意图方法签名）、值对象、`ports.py` 端口 Protocol
+2. `application/services/` — service 类骨架，依赖端口（构造注入）
+3. `infrastructure/db/` — ORM 映射 + repository 类（实现端口，方法体 TODO）
+4. `routers/` — 路由函数签名 + 依赖声明，体内 TODO
+5. `core/deps.py` — 依赖注入装配；`main.py` 挂路由
+{%- endif %}
+{% if include_agent %}
+**agent/**（见 `agent.md`、`agent-dag.md`、`agent-extension-points.md`）：
+1. `domain/` — 状态聚合、端口 Protocol、异常类
+2. `dag/nodes.py` + `runner.py` — 节点函数签名 + 串联结构，体内 TODO
+3. 新外部能力 → 扩展点目录 + 端口 + registry 占位
+{%- endif %}
+{% if include_frontend %}
+**frontend/**（见 `frontend.md`、`frontend-runtime.md`）：
+1. `types/` + `schemas/` — 类型定义 + Zod schema（这两层是声明，可写完整）
+2. `store/` — Zustand store 结构（state 形状 + action 签名，体内 TODO）
+3. `hooks/` — hook 签名 + 返回类型，体内 TODO
+4. `components/`（props 接口 + 占位渲染）+ `pages/`（组合骨架）
+{%- endif %}
+
+### 4. 结构自检（只验证骨架能编译，不跑测试）
+{%- if include_backend %}
+- backend：`cd backend && uv run ruff check src && uv run mypy src`
+{%- endif %}
+{%- if include_agent %}
+- agent：`cd agent && uv run ruff check src && uv run mypy src`
+{%- endif %}
+{%- if include_frontend %}
+- frontend：`cd frontend && pnpm lint && pnpm typecheck`
+{%- endif %}
+
+> 不跑 pytest/vitest——此阶段无业务逻辑，无测试。门禁只确认结构能编译、类型签名自洽。
+
+### 5. 汇报
+列出新增/修改的文件、新登记的错误码、以及**留给开发者填充的 TODO 清单**（哪些方法待实现）。
+
+## 约束（违反即返工）
+- **只搭结构与契约，不猜业务逻辑**——方法体 `raise NotImplementedError`，不臆造算法/规则/测试断言
+- 依赖只能向内：`routers → services → domain.ports ← repositories`，下层绝不 import 上层
+- 实现端口必须显式继承 Protocol + `@override`（见 `design-discipline.md`）
+- 不做超前设计，只生成本功能的最小切片；不一次性铺所有目录
+- 新错误码先登记到 `error-codes.md` 再使用
+- 后续填充逻辑时遵循 `testing-tdd.md`：先写测试（Red）再实现（Green）
